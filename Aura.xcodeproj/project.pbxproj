@@ -7,29 +7,31 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AuraApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = /* AuraApp.swift */; };
-		ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = /* ContentView.swift */; };
-		ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = /* ChatMessage.swift */; };
-		ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = /* ChatBubbleView.swift */; };
-		ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = /* ChatViewModel.swift */; };
-		ThetaAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = /* ThetaAPIService.swift */; };
-		AudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = /* AudioService.swift */; };
+		1A2B3C4D5E6F7890ABCD1234 /* AuraApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3C4D5E6F7890AB12345678 /* AuraApp.swift */; };
+		3C4D5E6F7890ABCD23456789 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5E6F7890ABCD1234567890 /* ContentView.swift */; };
+		5E6F7890ABCD345678901234 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F7890ABCD12345678904567 /* ChatMessage.swift */; };
+		7890ABCD456789012345ABCD /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 890ABCD1567890123456BCDE /* ChatBubbleView.swift */; };
+		90ABCD16789012345678CDEF /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0BCDE278901234567890DEF /* ChatViewModel.swift */; };
+		B0CDE3890123456789012EF0 /* ThetaAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF490123456789012F012 /* ThetaAPIService.swift */; };
+		D0EF5A012345678901234012 /* AudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0F06B123456789012345123 /* AudioService.swift */; };
+		F0017C234567890123456234 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0018D345678901234567345 /* Preview Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		Aura.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aura.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		AuraApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuraApp.swift; sourceTree = "<group>"; };
-		ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
-		ChatBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
-		ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
-		ThetaAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThetaAPIService.swift; sourceTree = "<group>"; };
-		AudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioService.swift; sourceTree = "<group>"; };
-		Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		11229E45678901234567845F /* Aura.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aura.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2B3C4D5E6F7890AB12345678 /* AuraApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuraApp.swift; sourceTree = "<group>"; };
+		4D5E6F7890ABCD1234567890 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		6F7890ABCD12345678904567 /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
+		890ABCD1567890123456BCDE /* ChatBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
+		A0BCDE278901234567890DEF /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
+		C0DEF490123456789012F012 /* ThetaAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThetaAPIService.swift; sourceTree = "<group>"; };
+		E0F06B123456789012345123 /* AudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioService.swift; sourceTree = "<group>"; };
+		0018D345678901234567345 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		23AF9B567890123456789567 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		frameworksBuildPhase */ = {
+		45BC0C678901234567890678 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -39,47 +41,56 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		mainGroup */ = {
+		67CD1D789012345678901789 = {
 			isa = PBXGroup;
 			children = (
-				/* Aura */,
-				/* Products */,
+				89DE2E89012345678901289A /* Aura */,
+				AB0F3F90123456789012390B /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		Products */ = {
+		AB0F3F90123456789012390B /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				/* Aura.app */,
+				11229E45678901234567845F /* Aura.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		Aura */ = {
+		89DE2E89012345678901289A /* Aura */ = {
 			isa = PBXGroup;
 			children = (
-				/* AuraApp.swift */,
-				/* ContentView.swift */,
-				/* ChatBubbleView.swift */,
-				/* ChatMessage.swift */,
-				/* ChatViewModel.swift */,
-				/* ThetaAPIService.swift */,
-				/* AudioService.swift */,
-				/* Info.plist */,
+				2B3C4D5E6F7890AB12345678 /* AuraApp.swift */,
+				4D5E6F7890ABCD1234567890 /* ContentView.swift */,
+				890ABCD1567890123456BCDE /* ChatBubbleView.swift */,
+				6F7890ABCD12345678904567 /* ChatMessage.swift */,
+				A0BCDE278901234567890DEF /* ChatViewModel.swift */,
+				C0DEF490123456789012F012 /* ThetaAPIService.swift */,
+				E0F06B123456789012345123 /* AudioService.swift */,
+				23AF9B567890123456789567 /* Info.plist */,
+				CD205091234567890123450C /* Preview Content */,
 			);
 			path = Aura;
+			sourceTree = "<group>";
+		};
+		CD205091234567890123450C /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				0018D345678901234567345 /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		Aura */ = {
+		EF311A23456789012345601D /* Aura */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = /* XCConfigurationList "Aura" */;
+			buildConfigurationList = 122B4C567890123456789012 /* Build configuration list for PBXNativeTarget "Aura" */;
 			buildPhases = (
-				/* Sources */,
-				/* frameworksBuildPhase */,
-				/* Resources */,
+				344D5D6789012345678901234 /* Sources */,
+				45BC0C678901234567890678 /* Frameworks */,
+				566E6E789012345678901456 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -87,25 +98,25 @@
 			);
 			name = Aura;
 			productName = Aura;
-			productReference = /* Aura.app */;
+			productReference = 11229E45678901234567845F /* Aura.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		project */ = {
+		788F7F890123456789012567 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1500;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
-					/* Aura */ = {
+					EF311A23456789012345601D = {
 						CreatedOnToolsVersion = 15.0;
 					};
 				};
 			};
-			buildConfigurationList = /* XCConfigurationList "Project" */;
+			buildConfigurationList = 9A9080A123456789012345678 /* Build configuration list for PBXProject "Aura" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -113,45 +124,46 @@
 				en,
 				Base,
 			);
-			mainGroup = /* mainGroup */;
-			productRefGroup = /* Products */;
+			mainGroup = 67CD1D789012345678901789;
+			productRefGroup = AB0F3F90123456789012390B /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				/* Aura */,
+				EF311A23456789012345601D /* Aura */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		Resources */ = {
+		566E6E789012345678901456 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F0017C234567890123456234 /* Preview Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		Sources */ = {
+		344D5D6789012345678901234 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				/* ContentView.swift in Sources */,
-				/* ChatMessage.swift in Sources */,
-				/* ChatBubbleView.swift in Sources */,
-				/* ChatViewModel.swift in Sources */,
-				/* ThetaAPIService.swift in Sources */,
-				/* AudioService.swift in Sources */,
-				/* AuraApp.swift in Sources */,
+				3C4D5E6F7890ABCD23456789 /* ContentView.swift in Sources */,
+				5E6F7890ABCD345678901234 /* ChatMessage.swift in Sources */,
+				7890ABCD456789012345ABCD /* ChatBubbleView.swift in Sources */,
+				90ABCD16789012345678CDEF /* ChatViewModel.swift in Sources */,
+				B0CDE3890123456789012EF0 /* ThetaAPIService.swift in Sources */,
+				D0EF5A012345678901234012 /* AudioService.swift in Sources */,
+				1A2B3C4D5E6F7890ABCD1234 /* AuraApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		BuildConfiguration.Debug */ = {
+		BC1223D456789012345678901 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -175,7 +187,7 @@
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_literal_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
@@ -212,7 +224,7 @@
 			};
 			name = Debug;
 		};
-		BuildConfiguration.Release */ = {
+		DE2334E567890123456789012 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -267,14 +279,14 @@
 			};
 			name = Release;
 		};
-		TargetBuildConfiguration.Debug */ = {
+		F03445F678901234567890123 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "Aura/Preview\ Content";
+				DEVELOPMENT_ASSET_PATHS = "Aura/Preview\\ Content";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -298,14 +310,14 @@
 			};
 			name = Debug;
 		};
-		TargetBuildConfiguration.Release */ = {
+		124556789012345678901234 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "Aura/Preview\ Content";
+				DEVELOPMENT_ASSET_PATHS = "Aura/Preview\\ Content";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -332,25 +344,25 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		XCConfigurationList "Project" */ = {
+		9A9080A123456789012345678 /* Build configuration list for PBXProject "Aura" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				/* BuildConfiguration.Debug */,
-				/* BuildConfiguration.Release */,
+				BC1223D456789012345678901 /* Debug */,
+				DE2334E567890123456789012 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		XCConfigurationList "Aura" */ = {
+		122B4C567890123456789012 /* Build configuration list for PBXNativeTarget "Aura" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				/* TargetBuildConfiguration.Debug */,
-				/* TargetBuildConfiguration.Release */,
+				F03445F678901234567890123 /* Debug */,
+				124556789012345678901234 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = /* project */;
+	rootObject = 788F7F890123456789012567 /* Project object */;
 }
