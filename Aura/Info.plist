@@ -23,7 +23,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Aura needs access to your microphone to listen to your voice and provide thoughtful responses. Your audio is only used for transcription and is not stored permanently.</string>
+	<string>Aura needs access to your microphone to listen to your voice and provide thoughtful responses. Your audio is processed on-device and never sent to external servers.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Aura uses on-device speech recognition to convert your voice into text for AI coaching conversations. Your speech is processed locally for privacy.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

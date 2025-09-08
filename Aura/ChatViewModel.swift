@@ -8,9 +8,14 @@
 import Foundation
 import Combine
 import SwiftUI
+import AVFoundation
+import os.log
 
 @MainActor
 class ChatViewModel: ObservableObject {
+    
+    // MARK: - Logger
+    private let logger = Logger(subsystem: "com.yourcompany.Aura", category: "ChatViewModel")
     
     // MARK: - Published Properties
     @Published var messages: [ChatMessage] = []
@@ -25,11 +30,9 @@ class ChatViewModel: ObservableObject {
     
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()
-    private var silenceTimer: Timer?
-    private let silenceTimeout: TimeInterval = 4.0 // 4 seconds of silence
     
     // MARK: - App State
-    enum AppState {
+    enum AppState: Equatable {
         case idle
         case listening
         case processing
@@ -64,12 +67,39 @@ class ChatViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Monitor microphone permission
+        // Monitor speech recognition permission
         audioService.$hasPermission
             .receive(on: DispatchQueue.main)
             .sink { [weak self] hasPermission in
-                if !hasPermission {
-                    self?.appState = .error("Microphone permission required")
+                self?.logger.debug("🎤 Speech recognition permission status: \(hasPermission)")
+                // Clear any existing permission error when permission is granted
+                if hasPermission, case .error(let errorText) = self?.appState, errorText.contains("permission") {
+                    self?.appState = .idle
+                }
+            }
+            .store(in: &cancellables)
+        
+        // Bind recognized text updates
+        audioService.$recognizedText
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] text in
+                // Show live transcription feedback in UI if needed
+                self?.logger.debug("📝 Live transcription: \(text.prefix(50))...")
+            }
+            .store(in: &cancellables)
+        
+        // Monitor for recognition completion - when final text is available and recognition stops
+        audioService.$isRecognizing
+            .combineLatest(audioService.$recognizedText)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] (isRecognizing, recognizedText) in
+                // When recognition stops and we have text, process it
+                if !isRecognizing && !recognizedText.isEmpty {
+                    Task { @MainActor in
+                        await self?.processTranscribedText(recognizedText)
+                        // Clear the recognized text for next session
+                        self?.audioService.recognizedText = ""
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -86,8 +116,15 @@ class ChatViewModel: ObservableObject {
     // MARK: - Recording Control
     func startRecording() {
         guard !isRecording else { return }
+        
+        // Check if speech recognition is available and permissions are granted
         guard audioService.hasPermission else {
-            appState = .error("Microphone permission required")
+            appState = .error("Speech recognition permission required. Please enable in Settings.")
+            return
+        }
+        
+        guard audioService.isAvailable else {
+            appState = .error("Speech recognition is not available on this device.")
             return
         }
         
@@ -97,9 +134,6 @@ class ChatViewModel: ObservableObject {
             appState = .listening
             errorMessage = nil
             
-            // Start silence detection timer
-            startSilenceTimer()
-            
         } catch {
             handleError(error)
         }
@@ -108,54 +142,32 @@ class ChatViewModel: ObservableObject {
     func stopRecording() {
         guard isRecording else { return }
         
+        _ = audioService.stopRecording()
         isRecording = false
         appState = .processing
-        
-        // Stop silence timer
-        silenceTimer?.invalidate()
-        silenceTimer = nil
-        
-        // Get recorded audio data
-        let audioData = audioService.stopRecording()
-        
-        // Process the audio
-        Task {
-            await processRecordedAudio(audioData)
-        }
     }
     
-    // MARK: - Audio Processing
-    private func processRecordedAudio(_ audioData: Data) async {
-        guard !audioData.isEmpty else {
+    // MARK: - Text Processing (from On-Device Speech Recognition)
+    private func processTranscribedText(_ transcribedText: String) async {
+        let trimmedText = transcribedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !trimmedText.isEmpty else {
             await MainActor.run {
                 self.appState = .idle
             }
             return
         }
         
+        // Add user message with transcribed text
+        await MainActor.run {
+            let userMessage = ChatMessage(text: trimmedText, role: .user)
+            self.messages.append(userMessage)
+        }
+        
+        // Get AI response after brief delay to allow UI update
         do {
-            // Convert PCM data to WAV format for Whisper API
-            let wavData = audioService.convertToWAV(pcmData: audioData)
-            
-            // Transcribe audio to text
-            let transcription = try await apiService.transcribe(audioData: wavData)
-            
-            // Add user message if transcription is not empty
-            if !transcription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                await MainActor.run {
-                    let userMessage = ChatMessage(text: transcription, role: .user)
-                    self.messages.append(userMessage)
-                }
-                
-                // Get AI response after brief delay to allow UI update
-                try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                await getAIResponse()
-            } else {
-                await MainActor.run {
-                    self.appState = .idle
-                }
-            }
-            
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            await getAIResponse()
         } catch {
             await MainActor.run {
                 self.handleError(error)
@@ -165,7 +177,7 @@ class ChatViewModel: ObservableObject {
     
     private func getAIResponse() async {
         do {
-            let aiResponse = try await apiService.getAIInsight(history: messages)
+            let aiResponse = try await apiService.generateAIInsight(messages: messages)
             
             await MainActor.run {
                 let aiMessage = ChatMessage(text: aiResponse, role: .ai)
@@ -180,29 +192,16 @@ class ChatViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Silence Detection
-    private func startSilenceTimer() {
-        silenceTimer?.invalidate()
-        
-        silenceTimer = Timer.scheduledTimer(withTimeInterval: silenceTimeout, repeats: false) { [weak self] _ in
-            Task { @MainActor in
-                self?.handleSilenceTimeout()
-            }
-        }
-    }
-    
-    private func handleSilenceTimeout() {
-        guard isRecording else { return }
-        
-        // Auto-stop recording after silence
-        stopRecording()
+    // MARK: - Helper Methods
+    func recheckPermissions() {
+        audioService.recheckPermission()
     }
     
     // MARK: - Error Handling
     private func handleError(_ error: Error) {
         let errorText: String
         
-        if let apiError = error as? APIError {
+        if let apiError = error as? ThetaAPIService.APIError {
             errorText = apiError.localizedDescription
         } else if let audioError = error as? AudioError {
             errorText = audioError.localizedDescription
