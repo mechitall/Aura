@@ -87,7 +87,21 @@ fastlane/test_output
 
 iOSInjectionProject/
 
-# API Keys (IMPORTANT: Never commit API keys)
+# Environment variables and API Keys (IMPORTANT: Never commit API keys)
+.env
+.env.local
+.env.development
+.env.production
 APIKeys.swift
 Secrets.swift
 Config.swift
+
+# macOS
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+
+# Logs
+*.log

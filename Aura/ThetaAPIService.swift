@@ -4,8 +4,20 @@ import os.log
 class ThetaAPIService {
     private let logger = Logger(subsystem: "com.yourcompany.Aura", category: "ThetaAPIService")
     
-    private let apiKey = "m9fkzvj5vq6rvbn83u4qtdatkuqmw0c5c29x6g0ubr9b6sh0784rmwfwk0bdg5nw"
+    private let apiKey: String
     private let baseURL = "https://ondemand.thetaedgecloud.com/infer_request/llama_3_1_70b/completions"
+    
+    init() {
+        // Load API key from configuration
+        self.apiKey = Config.shared.thetaAPIKey
+        
+        // Validate that we have an API key
+        if apiKey.isEmpty {
+            logger.error("⚠️ No Theta API key found! Please check your configuration.")
+        } else {
+            logger.info("✅ Theta API key loaded successfully")
+        }
+    }
     
     enum APIError: Error {
         case invalidURL

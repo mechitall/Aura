@@ -37,12 +37,18 @@ The app follows a strict MVVM (Model-View-ViewModel) pattern:
    open Aura.xcodeproj
    ```
 
-2. **Configure API Key**:
-   - Open `ThetaAPIService.swift`
-   - Replace `"YOUR_THETA_API_KEY_HERE"` with your actual Theta EdgeCloud API key:
-   ```swift
-   private let apiKey = "your_actual_theta_api_key_here"
-   ```
+2. **Configure API Key** (Choose one method):
+   
+   **Method A: Using Config.plist (Recommended for iOS)**
+   - Copy `Config-template.plist` to `Config.plist`
+   - Replace `YOUR_THETA_API_KEY_HERE` with your actual Theta EdgeCloud API key
+   - Add `Config.plist` to your Xcode project if not already included
+   
+   **Method B: Using Environment Variables**
+   - Copy `.env.template` to `.env`
+   - Replace `YOUR_THETA_API_KEY_HERE` with your actual API key
+   
+   **Note**: Both `Config.plist` and `.env` are in `.gitignore` for security
 
 3. **Update Bundle Identifier**:
    - Select the project in Xcode Navigator
