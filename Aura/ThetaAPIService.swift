@@ -4,7 +4,7 @@ import os.log
 class ThetaAPIService {
     private let logger = Logger(subsystem: "com.yourcompany.Aura", category: "ThetaAPIService")
     
-    private let apiKey = "sk-b65eu3mkh669b7a4ppl2s25b7yf0b0c9c339a3"
+    private let apiKey = "m9fkzvj5vq6rvbn83u4qtdatkuqmw0c5c29x6g0ubr9b6sh0784rmwfwk0bdg5nw"
     private let baseURL = "https://ondemand.thetaedgecloud.com/infer_request/llama_3_1_70b/completions"
     
     enum APIError: Error {
@@ -17,6 +17,15 @@ class ThetaAPIService {
     
     func generateAIInsight(messages: [ChatMessage]) async throws -> String {
         logger.info("💬 Starting AI insight generation with \(messages.count) messages in history")
+        
+        // Validate that we have actual user messages with content
+        let userMessages = messages.filter { $0.role.isUser && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        guard !userMessages.isEmpty else {
+            logger.error("❌ No valid user messages found - skipping API call")
+            throw APIError.noResponse
+        }
+        
+        logger.info("📊 Found \(userMessages.count) valid user messages")
         
         guard let url = URL(string: baseURL) else {
             logger.error("❌ Invalid URL for Theta EdgeCloud API")
@@ -52,23 +61,35 @@ class ThetaAPIService {
         
         var apiMessages = [systemMessage]
         
+        // Only include messages with actual content
         for message in messages {
-            apiMessages.append(ThetaMessage(
-                role: message.role.isUser ? "user" : "assistant",
-                content: message.text
-            ))
+            let trimmedText = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedText.isEmpty {
+                apiMessages.append(ThetaMessage(
+                    role: message.role.isUser ? "user" : "assistant",
+                    content: trimmedText
+                ))
+            }
         }
         
         let requestBody = ThetaRequest(
-            messages: apiMessages,
-            max_tokens: 500,
-            temperature: 0.7,
-            stream: true
+            input: ThetaRequestInput(
+                messages: apiMessages,
+                max_tokens: 500,
+                temperature: 0.7,
+                stream: true
+            )
         )
         
         do {
             let jsonData = try JSONEncoder().encode(requestBody)
             request.httpBody = jsonData
+            
+            // Debug: Log the actual request being sent
+            if let jsonString = String(data: jsonData, encoding: .utf8) {
+                logger.info("📤 Request JSON: \(jsonString)")
+            }
+            logger.info("📊 Sending \(apiMessages.count) total messages to API")
             
             logger.info("🚀 Making request to Theta EdgeCloud API")
             
@@ -179,6 +200,10 @@ class ThetaAPIService {
 
 // MARK: - Request/Response Models
 struct ThetaRequest: Codable {
+    let input: ThetaRequestInput
+}
+
+struct ThetaRequestInput: Codable {
     let messages: [ThetaMessage]
     let max_tokens: Int
     let temperature: Double
