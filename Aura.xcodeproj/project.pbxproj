@@ -14,6 +14,7 @@
 		90ABCD16789012345678CDEF /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0BCDE278901234567890DEF /* ChatViewModel.swift */; };
 		B0CDE3890123456789012EF0 /* ThetaAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF490123456789012F012 /* ThetaAPIService.swift */; };
 		D0EF5A012345678901234012 /* AudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0F06B123456789012345123 /* AudioService.swift */; };
+		F1208D34567890123456CDEF /* ContinuousSpeechService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01319E45678901234567DEFA /* ContinuousSpeechService.swift */; };
 		F0017C234567890123456234 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0018D345678901234567345 /* Preview Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -26,6 +27,7 @@
 		A0BCDE278901234567890DEF /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
 		C0DEF490123456789012F012 /* ThetaAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThetaAPIService.swift; sourceTree = "<group>"; };
 		E0F06B123456789012345123 /* AudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioService.swift; sourceTree = "<group>"; };
+		01319E45678901234567DEFA /* ContinuousSpeechService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuousSpeechService.swift; sourceTree = "<group>"; };
 		0018D345678901234567345 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		23AF9B567890123456789567 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -67,6 +69,7 @@
 				A0BCDE278901234567890DEF /* ChatViewModel.swift */,
 				C0DEF490123456789012F012 /* ThetaAPIService.swift */,
 				E0F06B123456789012345123 /* AudioService.swift */,
+				01319E45678901234567DEFA /* ContinuousSpeechService.swift */,
 				23AF9B567890123456789567 /* Info.plist */,
 				CD205091234567890123450C /* Preview Content */,
 			);
@@ -156,6 +159,7 @@
 				90ABCD16789012345678CDEF /* ChatViewModel.swift in Sources */,
 				B0CDE3890123456789012EF0 /* ThetaAPIService.swift in Sources */,
 				D0EF5A012345678901234012 /* AudioService.swift in Sources */,
+				F1208D34567890123456CDEF /* ContinuousSpeechService.swift in Sources */,
 				1A2B3C4D5E6F7890ABCD1234 /* AuraApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

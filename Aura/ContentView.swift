@@ -30,9 +30,35 @@ struct ContentView: View {
                 VStack(spacing: 0) {
                     // Custom Navigation Header
                     AuraNavigationHeader(
-                        isRecording: viewModel.isRecording,
+                        isListening: viewModel.isListening,
                         onClear: { viewModel.clearMessages() }
                     )
+                    
+                    // Text input for simulator (since speech doesn't work on simulator)
+                    VStack(spacing: 8) {
+                        TextField("Type your speech here (simulator only)", text: $viewModel.manualSpeechInput)
+                            .textFieldStyle(.roundedBorder)
+                            .padding(.horizontal, 20)
+                        
+                        HStack(spacing: 12) {
+                            Button("Add to Speech") {
+                                viewModel.addManualSpeech()
+                            }
+                            .buttonStyle(.bordered)
+                            .foregroundColor(.blue)
+                            .disabled(viewModel.manualSpeechInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            
+                            if !viewModel.accumulatedText.isEmpty {
+                                Button("📤 Send to AI (\(viewModel.accumulatedText.count) chars)") {
+                                    viewModel.sendCurrentSpeechToAI()
+                                }
+                                .buttonStyle(.bordered)
+                                .foregroundColor(.green)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    .padding(.vertical, 8)
                     
                     // Chat messages area with glass effect
                     ScrollViewReader { proxy in
@@ -98,7 +124,7 @@ struct ContentView: View {
 
 // MARK: - Aura Navigation Header
 struct AuraNavigationHeader: View {
-    let isRecording: Bool
+    let isListening: Bool
     let onClear: () -> Void
     
     var body: some View {
@@ -117,12 +143,12 @@ struct AuraNavigationHeader: View {
                         )
                     )
                     .frame(width: 32, height: 32)
-                    .scaleEffect(isRecording ? 1.1 : 1.0)
+                    .scaleEffect(isListening ? 1.1 : 1.0)
                     .animation(
-                        isRecording ? 
+                        isListening ? 
                         .easeInOut(duration: 1.5).repeatForever(autoreverses: true) : 
                         .spring(),
-                        value: isRecording
+                        value: isListening
                     )
                     .overlay {
                         Image(systemName: "brain.head.profile")
@@ -234,7 +260,7 @@ struct AuraWelcomeCard: View {
                     .fontWeight(.semibold)
                     .multilineTextAlignment(.center)
                 
-                Text("Your AI life coach is here to listen and help you process your thoughts and feelings. Tap the microphone to start our conversation.")
+                Text("Your AI life coach is here to listen continuously. I'll automatically start listening and respond to your thoughts and feelings every minute or when you pause. Just speak naturally!")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -243,10 +269,10 @@ struct AuraWelcomeCard: View {
             
             // Subtle hint
             HStack(spacing: 4) {
-                Image(systemName: "mic.fill")
+                Image(systemName: "ear.and.waveform")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text("Tap to speak")
+                Text("Always listening")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -277,7 +303,7 @@ struct AuraWelcomeCard: View {
     }
 }
 
-// MARK: - Aura Recording Interface
+// MARK: - Aura Continuous Listening Interface
 struct AuraRecordingInterface: View {
     @ObservedObject var viewModel: ChatViewModel
     let screenWidth: CGFloat
@@ -285,25 +311,101 @@ struct AuraRecordingInterface: View {
     @State private var breathingScale: CGFloat = 1.0
     
     var body: some View {
-        VStack(spacing: 24) {
-            // Status text with better typography
-            Text(viewModel.appState.displayText)
-                .font(.title3)
-                .fontWeight(.medium)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [
-                            Color.primary,
-                            Color.primary.opacity(0.8)
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
+        VStack(spacing: 20) {
+            // Status text with enhanced information
+            VStack(spacing: 8) {
+                Text(viewModel.appState.displayText)
+                    .font(.title3)
+                    .fontWeight(.medium)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [
+                                Color.primary,
+                                Color.primary.opacity(0.8)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
                     )
-                )
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+                    .multilineTextAlignment(.center)
+                
+                // Show context info when listening
+                if viewModel.isListening {
+                    HStack(spacing: 16) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "message")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Text("\(viewModel.messages.count) msgs")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        if viewModel.getApiContextSize() > 0 {
+                            HStack(spacing: 4) {
+                                Image(systemName: "brain")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text("\(viewModel.getApiContextSize()) context")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .padding(.horizontal, 32)
             
-            // Premium microphone button
+            // Accumulated text preview
+            if !viewModel.accumulatedText.isEmpty {
+                ScrollView {
+                    Text("\"\(viewModel.accumulatedText)\"")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .italic()
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(.ultraThinMaterial)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(auraColor.opacity(0.2), lineWidth: 1)
+                                }
+                        }
+                }
+                .frame(maxHeight: 100)
+                .padding(.horizontal, 20)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            
+            // Timer countdown
+            if viewModel.isListening {
+                HStack(spacing: 8) {
+                    Image(systemName: "timer")
+                        .font(.caption)
+                        .foregroundColor(auraColor)
+                    Text("Next send: \(Int(viewModel.timeUntilNextSend))s")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(auraColor)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background {
+                    Capsule()
+                        .fill(auraColor.opacity(0.1))
+                        .overlay {
+                            Capsule()
+                                .stroke(auraColor.opacity(0.3), lineWidth: 1)
+                        }
+                }
+                .transition(.scale.combined(with: .opacity))
+            }
+            
+            // Continuous listening button
             ZStack {
                 // Breathing background effect
                 Circle()
@@ -327,8 +429,8 @@ struct AuraRecordingInterface: View {
                         value: breathingScale
                     )
                 
-                // Pulse rings when recording
-                if viewModel.isRecording {
+                // Pulse rings when listening
+                if viewModel.isListening {
                     ForEach(0..<3) { index in
                         Circle()
                             .stroke(
@@ -350,11 +452,7 @@ struct AuraRecordingInterface: View {
                 // Main button
                 Button(action: {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                        if viewModel.isRecording {
-                            viewModel.stopRecording()
-                        } else {
-                            viewModel.startRecording()
-                        }
+                        viewModel.toggleContinuousListening()
                     }
                 }) {
                     ZStack {
@@ -382,22 +480,32 @@ struct AuraRecordingInterface: View {
                         Circle()
                             .fill(
                                 LinearGradient(
-                                    colors: viewModel.isRecording ? 
-                                    [Color.red, Color.red.opacity(0.8)] :
+                                    colors: viewModel.isListening ? 
+                                    [Color.green, Color.green.opacity(0.8)] :
                                     [auraColor, auraColor.opacity(0.8)],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
                             )
                             .frame(width: 80, height: 80)
-                            .scaleEffect(viewModel.isRecording ? 0.9 : 1.0)
+                            .scaleEffect(viewModel.isListening ? 0.9 : 1.0)
                         
-                        // Icon with better styling
-                        Image(systemName: viewModel.isRecording ? "stop.fill" : "mic.fill")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .scaleEffect(viewModel.isRecording ? 1.1 : 1.0)
+                        // Icon with better styling - shows continuous listening state
+                        Group {
+                            if viewModel.isListening {
+                                Image(systemName: "waveform")
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .scaleEffect(1.1)
+                            } else {
+                                Image(systemName: "ear.and.waveform")
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .scaleEffect(1.0)
+                            }
+                        }
                     }
                 }
                 .disabled(viewModel.appState == .processing)
@@ -406,12 +514,12 @@ struct AuraRecordingInterface: View {
             }
             .onAppear {
                 breathingScale = 1.05
-                if viewModel.isRecording {
+                if viewModel.isListening {
                     pulseScale = 2.0
                 }
             }
-            .onChange(of: viewModel.isRecording) { isRecording in
-                if isRecording {
+            .onChange(of: viewModel.isListening) { isListening in
+                if isListening {
                     pulseScale = 2.0
                 } else {
                     pulseScale = 1.0
@@ -419,22 +527,31 @@ struct AuraRecordingInterface: View {
             }
             
             // Enhanced recording level indicator
-            if viewModel.isRecording {
+            if viewModel.isListening {
                 AuraWaveformView(level: viewModel.recordingLevel)
-                    .frame(height: 60)
+                    .frame(height: 50)
                     .padding(.horizontal, 40)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             
             // Privacy and recording hint
-            HStack(spacing: 4) {
-                Image(systemName: "shield.fill")
-                    .font(.caption2)
-                    .foregroundColor(auraColor.opacity(0.7))
+            VStack(spacing: 4) {
+                HStack(spacing: 4) {
+                    Image(systemName: "shield.fill")
+                        .font(.caption2)
+                        .foregroundColor(auraColor.opacity(0.7))
+                    
+                    Text(viewModel.isListening ? "Continuous listening active" : "Tap to start continuous listening")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
                 
-                Text("Your voice stays on your device • Powered by Apple Speech Recognition")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                if viewModel.isListening && viewModel.timeUntilNextApiRequest > 0 {
+                    Text("Next API request in \(Int(viewModel.timeUntilNextApiRequest))s")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.7))
+                        .transition(.opacity)
+                }
             }
             .padding(.bottom, 8)
         }
