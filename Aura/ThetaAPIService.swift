@@ -4,7 +4,7 @@ import os.log
 class ThetaAPIService {
     private let logger = Logger(subsystem: "com.yourcompany.Aura", category: "ThetaAPIService")
     
-    private let apiKey = "332zr94npjc8rvfwsnitytwbz05acxb5y6tc8pbrpaiur2c5t0s1tx5s7whfxbsd"
+    private let apiKey = "mupj6js5y1qn7b6nizpzu0gde80n56b4275xxu1cs5hsfztfii64qj7wthxgkvvk"
     private let baseURL = "https://ondemand.thetaedgecloud.com/infer_request/llama_3_1_70b/completions"
     
     // MARK: - Context Management
@@ -88,8 +88,11 @@ class ThetaAPIService {
         return apiMessages
     }
     
-    func generateAIInsight(messages: [ChatMessage]) async throws -> String {
-        logger.info("💬 Starting AI insight generation with \(messages.count) messages in history")
+    /// Generates an AI response for the accumulated conversation.
+    /// Added `useStreaming` flag so we can disable streaming easily while debugging missing responses.
+    /// When streaming is disabled the API is asked for a single JSON response which is easier to parse / log.
+    func generateAIInsight(messages: [ChatMessage], useStreaming: Bool = false) async throws -> String {
+        logger.info("💬 Starting AI insight generation (stream=\(useStreaming)) with \(messages.count) messages in history")
         
         // Check rate limiting
         guard checkRateLimit() else {
@@ -114,22 +117,37 @@ class ThetaAPIService {
             throw APIError.invalidURL
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    // Explicit Accept header improves clarity for server; ask for event-stream only if streaming enabled
+    request.setValue(useStreaming ? "text/event-stream" : "application/json", forHTTPHeaderField: "Accept")
+    // Defensive: shorter timeout to avoid hanging forever on SSE if server never closes
+    let sessionConfig = URLSessionConfiguration.ephemeral
+    sessionConfig.timeoutIntervalForRequest = 30
+    sessionConfig.timeoutIntervalForResource = 60
+    let session = URLSession(configuration: sessionConfig)
         
         // Use enhanced context management
         let apiMessages = manageContext(messages)
+
+        // Find the very last user message (what we expect to have just been sent)
+        if let lastUser = messages.last(where: { $0.role.isUser }) {
+            let preview = String(lastUser.text.prefix(120))
+            logger.info("📌 Last user message going into request: len=\(lastUser.text.count) preview='\(preview)'")
+        } else {
+            logger.warning("⚠️ No user message found when preparing request body")
+        }
         
         let requestBody = ThetaRequest(
             input: ThetaRequestInput(
                 messages: apiMessages,
-                max_tokens: 400, // Slightly reduced for more focused responses
-                temperature: 0.75, // Slightly higher for more natural conversation
-                stream: true,
-                top_p: 0.9, // Add nucleus sampling for better quality
-                frequency_penalty: 0.1 // Reduce repetition
+                max_tokens: 400,
+                temperature: 0.75,
+                stream: useStreaming, // now configurable
+                top_p: 0.9,
+                frequency_penalty: 0.1
             )
         )
         
@@ -143,9 +161,8 @@ class ThetaAPIService {
             }
             logger.info("📊 Sending \(apiMessages.count) total messages to API")
             
-            logger.info("🚀 Making request to Theta EdgeCloud API")
-            
-            let (data, response) = try await URLSession.shared.data(for: request)
+            logger.info("🚀 Making request to Theta EdgeCloud API (timeout=30s)")
+            let (data, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 logger.error("❌ Invalid response type from Theta EdgeCloud")
@@ -155,16 +172,38 @@ class ThetaAPIService {
             logger.info("📥 AI insight response status: \(httpResponse.statusCode)")
             
             if httpResponse.statusCode != 200 {
-                let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
-                logger.error("💥 Theta EdgeCloud API error (\(httpResponse.statusCode)): \(errorMessage)")
-                throw APIError.networkError(NSError(domain: "ThetaAPI", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMessage]))
+                let rawBody = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+                logger.error("💥 Theta EdgeCloud API error status=\(httpResponse.statusCode) body='\(rawBody.prefix(500))'")
+                if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                    logger.error("🔐 Authentication / authorization failure. Verify API key is valid & not expired.")
+                } else if httpResponse.statusCode == 404 {
+                    logger.error("❓ Endpoint not found – confirm model path /infer_request/llama_3_1_70b/completions is correct for current Theta deployment.")
+                } else if httpResponse.statusCode >= 500 {
+                    logger.error("🛠️ Server-side error – may retry after delay.")
+                }
+                throw APIError.networkError(NSError(domain: "ThetaAPI", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: rawBody]))
             }
             
             let responseString = String(data: data, encoding: .utf8) ?? ""
             logger.info("📄 Raw AI response (first 500 chars): \(String(responseString.prefix(500)))")
             logger.info("📊 Response data size: \(data.count) bytes")
             
-            return try parseStreamingResponse(responseString: responseString)
+            // If streaming disabled just parse as normal JSON directly
+            if !useStreaming {
+                do {
+                    return try parseStreamingResponse(responseString: responseString)
+                } catch {
+                    logger.warning("⚠️ Non-stream parse failed, attempting direct JSON decode fallback")
+                    if let data = responseString.data(using: .utf8),
+                       let fallback = try? JSONDecoder().decode(ThetaResponse.self, from: data),
+                       let content = (fallback.choices.first?.message ?? fallback.choices.first?.delta)?.content {
+                        return content
+                    }
+                    throw error
+                }
+            } else {
+                return try parseStreamingResponse(responseString: responseString)
+            }
             
         } catch let error as APIError {
             throw error

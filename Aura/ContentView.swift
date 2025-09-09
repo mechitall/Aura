@@ -1,7 +1,6 @@
 //
 //  ContentView.swift
 //  Aura
-//
 //  Created on 9/8/25.
 //
 
@@ -31,34 +30,12 @@ struct ContentView: View {
                     // Custom Navigation Header
                     AuraNavigationHeader(
                         isListening: viewModel.isListening,
-                        onClear: { viewModel.clearMessages() }
+                        onClear: { viewModel.clearMessages() },
+                        onTestAI: { viewModel.sendTestPrompt() },
+                        showDebug: viewModel.debugMode
                     )
                     
-                    // Text input for simulator (since speech doesn't work on simulator)
-                    VStack(spacing: 8) {
-                        TextField("Type your speech here (simulator only)", text: $viewModel.manualSpeechInput)
-                            .textFieldStyle(.roundedBorder)
-                            .padding(.horizontal, 20)
-                        
-                        HStack(spacing: 12) {
-                            Button("Add to Speech") {
-                                viewModel.addManualSpeech()
-                            }
-                            .buttonStyle(.bordered)
-                            .foregroundColor(.blue)
-                            .disabled(viewModel.manualSpeechInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            
-                            if !viewModel.accumulatedText.isEmpty {
-                                Button("📤 Send to AI (\(viewModel.accumulatedText.count) chars)") {
-                                    viewModel.sendCurrentSpeechToAI()
-                                }
-                                .buttonStyle(.bordered)
-                                .foregroundColor(.green)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
-                    .padding(.vertical, 8)
+                    // Removed manual simulator input UI (was here) per updated product direction.
                     
                     // Chat messages area with glass effect
                     ScrollViewReader { proxy in
@@ -126,6 +103,8 @@ struct ContentView: View {
 struct AuraNavigationHeader: View {
     let isListening: Bool
     let onClear: () -> Void
+    var onTestAI: (() -> Void)? = nil
+    var showDebug: Bool = false
     
     var body: some View {
         HStack {
@@ -172,7 +151,24 @@ struct AuraNavigationHeader: View {
             }
             
             Spacer()
-            
+
+            // Debug button (if enabled)
+            if showDebug, let onTestAI = onTestAI {
+                Button(action: onTestAI) {
+                    Text("Test AI")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(Color.purple.opacity(0.7))
+                        )
+                }
+                .transition(.opacity)
+            }
+
             // Clear button with glass effect
             Button(action: onClear) {
                 Text("Clear")
@@ -379,6 +375,55 @@ struct AuraRecordingInterface: View {
                 .frame(maxHeight: 100)
                 .padding(.horizontal, 20)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            // Live partial + diagnostics (always show when listening for visibility)
+            if viewModel.isListening {
+                VStack(alignment: .leading, spacing: 6) {
+                    if !viewModel.livePartial.isEmpty {
+                        Text(viewModel.livePartial)
+                            .font(.caption)
+                            .foregroundColor(.primary)
+                            .lineLimit(3)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        Text("(no partial yet)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    HStack(spacing: 12) {
+                        Label("acc \(viewModel.accumulatedText.count)", systemImage: "square.stack.3d.up")
+                            .font(.caption2)
+                        if !viewModel.lastFinalSegment.isEmpty {
+                            Label("final \(min(viewModel.lastFinalSegment.count, 40))c", systemImage: "checkmark.seal")
+                                .font(.caption2)
+                        }
+                        Label("partial \(viewModel.livePartial.count)", systemImage: "waveform")
+                            .font(.caption2)
+                        if !viewModel.lastSentUserAccumulation.isEmpty {
+                            Label("sent \(viewModel.lastSentUserAccumulation.count)c", systemImage: "paperplane")
+                                .font(.caption2)
+                        }
+                    }
+                    .foregroundColor(.secondary)
+                    if !viewModel.lastSentUserAccumulation.isEmpty {
+                        Text("Last sent: \(String(viewModel.lastSentUserAccumulation.prefix(80)))\(viewModel.lastSentUserAccumulation.count > 80 ? "…" : "")")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                .padding(10)
+                .background {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(.ultraThinMaterial)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(auraColor.opacity(0.15), lineWidth: 1)
+                        }
+                }
+                .padding(.horizontal, 20)
+                .transition(.opacity)
             }
             
             // Timer countdown

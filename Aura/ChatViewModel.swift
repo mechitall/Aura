@@ -25,7 +25,10 @@ class ChatViewModel: ObservableObject {
     @Published var recordingLevel: Float = 0.0
     @Published var accumulatedText: String = ""
     @Published var timeUntilNextSend: TimeInterval = 0
-    @Published var manualSpeechInput: String = ""
+    @Published var livePartial: String = "" // live partial transcription (currentSessionText)
+    @Published var lastFinalSegment: String = "" // last confirmed final segment
+    @Published var lastSentUserAccumulation: String = "" // EXACT text block most recently sent to AI
+    @Published var debugMode: Bool = true // Enable debug utilities (can be toggled off for production)
     
     // MARK: - Services
     private let apiService = ThetaAPIService()
@@ -33,6 +36,7 @@ class ChatViewModel: ObservableObject {
     
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()
+    private var didAutoDebugPrompt = false // ensure we only auto-fire a debug test prompt once
     
     // MARK: - App State
     enum AppState: Equatable {
@@ -65,6 +69,17 @@ class ChatViewModel: ObservableObject {
             if self.continuousSpeechService.hasPermission && !self.isListening {
                 self.logger.info("🎯 Auto-starting continuous listening from ChatViewModel")
                 self.startContinuousListening()
+            }
+        }
+
+        // Automatically fire a single test prompt shortly after launch in debug mode so we can
+        // validate network path & observe logs without UI interaction (useful in CI / automation).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            guard let self = self else { return }
+            if self.debugMode && !self.didAutoDebugPrompt {
+                self.logger.info("🧪 Auto-debug: dispatching initial test prompt for connectivity check")
+                self.didAutoDebugPrompt = true
+                self.sendTestPrompt()
             }
         }
     }
@@ -107,6 +122,22 @@ class ChatViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] text in
                 self?.accumulatedText = text
+            }
+            .store(in: &cancellables)
+
+        // Bind live partial (current session text)
+        continuousSpeechService.$currentSessionText
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] text in
+                self?.livePartial = text
+            }
+            .store(in: &cancellables)
+
+        // Bind last final segment
+        continuousSpeechService.$lastFinalSegment
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] seg in
+                self?.lastFinalSegment = seg
             }
             .store(in: &cancellables)
         
@@ -179,12 +210,14 @@ class ChatViewModel: ObservableObject {
             return
         }
         
-        logger.info("� 👤 SENDING TO AI: Processing accumulated text (\(trimmedText.count) chars)")
+        logger.info("👤 SENDING TO AI: Processing accumulated text (\(trimmedText.count) chars)")
         logger.info("📝 Full text: '\(trimmedText)'")
         
         // Add user message with accumulated text
         await MainActor.run {
             self.appState = .processing
+            // Record exactly what we're sending for UI + diagnostics before any mutation
+            self.lastSentUserAccumulation = trimmedText
             let userMessage = ChatMessage(text: trimmedText, role: .user)
             self.messages.append(userMessage)
             self.logger.info("✨ User message added to chat - total messages: \(self.messages.count)")
@@ -205,6 +238,9 @@ class ChatViewModel: ObservableObject {
                 let aiMessage = ChatMessage(text: aiResponse, role: .ai)
                 self.messages.append(aiMessage)
                 
+                // ✅ CONFIRM SUCCESSFUL PROCESSING - Now it's safe to clear accumulated text
+                self.continuousSpeechService.confirmTextProcessed()
+                
                 // Return to continuous listening state if still listening
                 if self.isListening {
                     self.appState = .continuousListening
@@ -216,8 +252,10 @@ class ChatViewModel: ObservableObject {
             }
             
         } catch ThetaAPIService.APIError.rateLimited {
+            logger.warning("⏱️ Rate limited - keeping accumulated text for retry")
+            // Don't clear text on rate limit - we'll retry
+            
             await MainActor.run {
-                self.logger.warning("⏱️ Rate limited - will retry later")
                 // Don't show error to user, just continue listening
                 if self.isListening {
                     self.appState = .continuousListening
@@ -231,8 +269,11 @@ class ChatViewModel: ObservableObject {
             await getAIResponse()
             
         } catch {
+            logger.error("❌ API ERROR - keeping accumulated text: \(error.localizedDescription)")
+            
+            // ❌ HANDLE PROCESSING ERROR - Keep accumulated text for potential retry
             await MainActor.run {
-                self.logger.error("❌ API ERROR: \(error.localizedDescription)")
+                self.continuousSpeechService.handleProcessingError()
                 self.handleError(error)
             }
         }
@@ -303,46 +344,6 @@ class ChatViewModel: ObservableObject {
         logger.info("🧠 Messages and context cleared")
     }
     
-    // Send current accumulated speech to AI immediately
-    func sendCurrentSpeechToAI() {
-        let currentText = accumulatedText.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        guard !currentText.isEmpty else {
-            logger.warning("⚠️ No accumulated text to send")
-            return
-        }
-        
-        logger.info("📤 Manual send triggered - processing \(currentText.count) characters")
-        
-        Task {
-            await processAccumulatedText(currentText)
-            
-            // Clear the accumulated text after sending
-            await MainActor.run {
-                self.continuousSpeechService.clearAccumulatedText()
-            }
-        }
-    }
-    
-    // Add manual speech input to accumulated text (for simulator testing)
-    func addManualSpeech() {
-        let inputText = manualSpeechInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !inputText.isEmpty else { return }
-        
-        logger.info("⌨️ Adding manual speech input: \(inputText)")
-        
-        // Add to accumulated text (with space if there's existing text)
-        if !accumulatedText.isEmpty {
-            accumulatedText += " "
-        }
-        accumulatedText += inputText
-        
-        // Also update the service's accumulated text
-        continuousSpeechService.setTestAccumulatedText(accumulatedText)
-        
-        // Clear the input field
-        manualSpeechInput = ""
-    }
     
     func getApiContextSize() -> Int {
         return apiService.getContextSize()
@@ -358,5 +359,23 @@ class ChatViewModel: ObservableObject {
     
     var conversationHistory: [ChatMessage] {
         return messages.filter { !$0.text.isEmpty }
+    }
+
+    // MARK: - Diagnostics
+    func dumpDiagnostics() {
+        logger.info("📊 ChatViewModel diagnostics: livePartial='\(self.livePartial)' lastFinal='\(self.lastFinalSegment)' accumulatedCount=\(self.accumulatedText.count) lastSentLen=\(self.lastSentUserAccumulation.count) messages=\(self.messages.count)")
+    }
+
+    // MARK: - Debug / Test Utilities
+    func sendTestPrompt() {
+        Task { @MainActor in
+            let prompt = "Give me one concise, uplifting self-improvement insight and a reflective question."
+            logger.info("🧪 DEBUG: Injecting test prompt -> '\(prompt)'")
+            appState = .processing
+            lastSentUserAccumulation = prompt
+            let userMessage = ChatMessage(text: prompt, role: .user)
+            messages.append(userMessage)
+        }
+        Task { await getAIResponse() }
     }
 }
