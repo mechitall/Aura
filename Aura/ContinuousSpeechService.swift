@@ -61,15 +61,33 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
     override init() {
         super.init()
         setupSpeechRecognizer()
-        checkPermissions()
         
-        // Auto-start after a brief delay if permissions are available
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        // Request permissions explicitly on init
+        requestAllPermissions()
+        
+        // Auto-start after permissions are handled
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             if self.hasPermission && !self.isListening {
-                self.logger.info("🎯 Auto-starting continuous listening")
+                self.logger.info("🎯 Auto-starting continuous listening after permission check")
                 self.autoStarted = true
                 self.startContinuousListening()
             }
+        }
+    }
+    
+    private func requestAllPermissions() {
+        // First check if we need to request speech recognition permission
+        let speechStatus = SFSpeechRecognizer.authorizationStatus()
+        if speechStatus == .notDetermined {
+            logger.info("📋 Requesting speech recognition permission...")
+            SFSpeechRecognizer.requestAuthorization { [weak self] status in
+                Task { @MainActor in
+                    self?.logger.info("📋 Speech recognition permission result: \(String(describing: status))")
+                    self?.checkPermissions()
+                }
+            }
+        } else {
+            checkPermissions()
         }
     }
     
@@ -84,10 +102,17 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
         let audioSession = AVAudioSession.sharedInstance()
         
         do {
-            try audioSession.setCategory(.record, mode: .measurement, options: [.duckOthers, .allowBluetooth])
+            // Use proper category for speech recognition
+            try audioSession.setCategory(.record, mode: .spokenAudio, options: [.duckOthers, .allowBluetooth, .defaultToSpeaker])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+            
+            // Set preferred sample rate and buffer duration for speech recognition
+            try audioSession.setPreferredSampleRate(16000.0)
+            try audioSession.setPreferredIOBufferDuration(0.005)
+            
+            logger.info("✅ Audio session configured successfully")
         } catch {
-            logger.error("Failed to setup audio session: \(error)")
+            logger.error("❌ Failed to setup audio session: \(error)")
         }
     }
     
@@ -98,11 +123,13 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
         
         switch speechStatus {
         case .authorized:
+            logger.info("✅ Speech recognition permission already granted")
             checkMicrophonePermission()
         case .denied, .restricted:
             logger.error("❌ Speech recognition permission denied or restricted")
             hasPermission = false
         case .notDetermined:
+            logger.info("❓ Speech recognition permission not determined, requesting...")
             requestSpeechPermission()
         @unknown default:
             logger.warning("⚠️ Unknown speech recognition permission status")
@@ -160,6 +187,7 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
     }
     
     private func requestMicrophonePermission() {
+        logger.info("🎤 Requesting microphone permission...")
         AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
             Task { @MainActor in
                 if granted {
@@ -169,12 +197,14 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
                     // Auto-start after permission granted
                     if let self = self, !self.isListening && !self.autoStarted {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            self.logger.info("🎯 Auto-starting after microphone permission granted")
                             self.autoStarted = true
                             self.startContinuousListening()
                         }
                     }
                 } else {
                     self?.logger.error("❌ Microphone permission denied by user")
+                    self?.logger.error("ℹ️ Please enable microphone access in Settings > Privacy & Security > Microphone")
                     self?.hasPermission = false
                 }
             }
@@ -185,11 +215,18 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
     func startContinuousListening() {
         guard hasPermission else {
             logger.error("❌ Cannot start continuous listening: Permission not granted")
+            logger.error("ℹ️ Please ensure both Speech Recognition and Microphone permissions are enabled")
             return
         }
         
-        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
+        guard let speechRecognizer = speechRecognizer else {
+            logger.error("❌ Cannot start continuous listening: Speech recognizer not initialized")
+            return
+        }
+        
+        guard speechRecognizer.isAvailable else {
             logger.error("❌ Cannot start continuous listening: Speech recognizer unavailable")
+            logger.error("ℹ️ Speech recognition may not be supported on this device or in simulator")
             return
         }
         
@@ -199,6 +236,8 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
         }
         
         logger.info("🎤 Starting continuous speech recognition")
+        logger.info("🎯 Speech recognizer locale: \(speechRecognizer.locale.identifier)")
+        
         isListening = true
         
         // Start the accumulation timer
@@ -295,28 +334,48 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
                 return
             }
             
+            // Configure recognition request for optimal speech detection
             recognitionRequest.shouldReportPartialResults = true
             recognitionRequest.requiresOnDeviceRecognition = false // Use server for better accuracy
             
-            // Add context for better recognition
+            // Enhanced configuration for better recognition
             if #available(iOS 16.0, *) {
                 recognitionRequest.addsPunctuation = true
             }
+            
+            // Set task hint for better speech recognition
+            if #available(iOS 13.0, *) {
+                recognitionRequest.taskHint = .search
+            }
+            
+            logger.info("✅ Recognition request configured")
             
             // Setup audio engine
             let inputNode = audioEngine.inputNode
             let recordingFormat = inputNode.outputFormat(forBus: 0)
             
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
-                Task { @MainActor in
+            logger.info("🎤 Audio format: \(recordingFormat)")
+            
+            // Remove any existing taps first
+            inputNode.removeTap(onBus: 0)
+            
+            // Install tap with optimal buffer size for speech recognition
+            inputNode.installTap(onBus: 0, bufferSize: 4096, format: recordingFormat) { [weak self] buffer, _ in
+                // Process audio buffer on background queue to avoid blocking
+                DispatchQueue.global(qos: .userInteractive).async {
                     self?.recognitionRequest?.append(buffer)
-                    self?.updateRecordingLevel(from: buffer)
-                    self?.detectSpeechActivity(from: buffer)
+                    
+                    Task { @MainActor in
+                        self?.updateRecordingLevel(from: buffer)
+                        self?.detectSpeechActivity(from: buffer)
+                    }
                 }
             }
             
             audioEngine.prepare()
             try audioEngine.start()
+            
+            logger.info("✅ Audio engine started successfully")
             
             // Start recognition task
             recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
