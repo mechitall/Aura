@@ -14,12 +14,15 @@
 		90ABCD16789012345678CDEF /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0BCDE278901234567890DEF /* ChatViewModel.swift */; };
 		B0CDE3890123456789012EF0 /* ThetaAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF490123456789012F012 /* ThetaAPIService.swift */; };
 		D0EF5A012345678901234012 /* AudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0F06B123456789012345123 /* AudioService.swift */; };
-		F1208D34567890123456CDEF /* ContinuousSpeechService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01319E45678901234567DEFA /* ContinuousSpeechService.swift */; };
 		F0017C234567890123456234 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0018D345678901234567345 /* Preview Assets.xcassets */; };
+		F1208D34567890123456CDEF /* ContinuousSpeechService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01319E45678901234567DEFA /* ContinuousSpeechService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0018D345678901234567345 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		01319E45678901234567DEFA /* ContinuousSpeechService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuousSpeechService.swift; sourceTree = "<group>"; };
 		11229E45678901234567845F /* Aura.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aura.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		23AF9B567890123456789567 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		2B3C4D5E6F7890AB12345678 /* AuraApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuraApp.swift; sourceTree = "<group>"; };
 		4D5E6F7890ABCD1234567890 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		6F7890ABCD12345678904567 /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
@@ -27,9 +30,6 @@
 		A0BCDE278901234567890DEF /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
 		C0DEF490123456789012F012 /* ThetaAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThetaAPIService.swift; sourceTree = "<group>"; };
 		E0F06B123456789012345123 /* AudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioService.swift; sourceTree = "<group>"; };
-		01319E45678901234567DEFA /* ContinuousSpeechService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuousSpeechService.swift; sourceTree = "<group>"; };
-		0018D345678901234567345 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		23AF9B567890123456789567 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,14 +51,6 @@
 			);
 			sourceTree = "<group>";
 		};
-		AB0F3F90123456789012390B /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				11229E45678901234567845F /* Aura.app */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
 		89DE2E89012345678901289A /* Aura */ = {
 			isa = PBXGroup;
 			children = (
@@ -74,6 +66,14 @@
 				CD205091234567890123450C /* Preview Content */,
 			);
 			path = Aura;
+			sourceTree = "<group>";
+		};
+		AB0F3F90123456789012390B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				11229E45678901234567845F /* Aura.app */,
+			);
+			name = Products;
 			sourceTree = "<group>";
 		};
 		CD205091234567890123450C /* Preview Content */ = {
@@ -167,6 +167,37 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		124556789012345678901234 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "Aura/Preview\\ Content";
+				DEVELOPMENT_TEAM = NKR6TCB95N;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Aura/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mhumfrey.Aura;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		BC1223D456789012345678901 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -191,8 +222,8 @@
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_literal_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_OBJC_literal_CONVERSION = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
@@ -291,7 +322,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "Aura/Preview\\ Content";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = NKR6TCB95N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Aura/Info.plist;
@@ -306,7 +337,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.Aura;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mhumfrey.Aura;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -314,54 +345,23 @@
 			};
 			name = Debug;
 		};
-		124556789012345678901234 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "Aura/Preview\\ Content";
-				DEVELOPMENT_TEAM = "";
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Aura/Info.plist;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.Aura;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		9A9080A123456789012345678 /* Build configuration list for PBXProject "Aura" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				BC1223D456789012345678901 /* Debug */,
-				DE2334E567890123456789012 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		122B4C567890123456789012 /* Build configuration list for PBXNativeTarget "Aura" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F03445F678901234567890123 /* Debug */,
 				124556789012345678901234 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9A9080A123456789012345678 /* Build configuration list for PBXProject "Aura" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BC1223D456789012345678901 /* Debug */,
+				DE2334E567890123456789012 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
