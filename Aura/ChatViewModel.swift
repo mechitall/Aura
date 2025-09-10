@@ -81,6 +81,8 @@ class ChatViewModel: ObservableObject {
     self.lastAnalysis = EmotionalAnalysis(emotion: "Neutral", emoji: "😐")
         setupBindings()
         setupWelcomeMessage()
+    // Start emotional analysis loop immediately so it runs every 30s without user interaction
+    startEmotionalAnalysisTimer()
         
         // Auto-start continuous listening after brief delay if permissions are available
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
@@ -202,7 +204,9 @@ class ChatViewModel: ObservableObject {
         }
         
         continuousSpeechService.startContinuousListening()
-        startEmotionalAnalysisTimer()
+        if emotionalAnalysisTimer == nil { // avoid resetting schedule if already running from init
+            startEmotionalAnalysisTimer()
+        }
         errorMessage = nil
         logger.info("🔄 Started continuous speech recognition")
     }
