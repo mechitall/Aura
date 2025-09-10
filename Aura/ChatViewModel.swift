@@ -26,17 +26,24 @@ class ChatViewModel: ObservableObject {
     @Published var accumulatedText: String = ""
     @Published var timeUntilNextSend: TimeInterval = 0
     @Published var livePartial: String = "" // live partial transcription (currentSessionText)
-    @Published var lastFinalSegment: String = "" // last confirmed final segment
     @Published var lastSentUserAccumulation: String = "" // EXACT text block most recently sent to AI
     @Published var debugMode: Bool = true // Enable debug utilities (can be toggled off for production)
+    
+    // MARK: - Theta Edge Analysis Properties
+    @Published var lastAnalysis: String = ""
+    @Published var isAnalyzing: Bool = false
+    @Published var analysisHistory: [ThetaEdgeAnalysisService.AnalysisResult] = []
     
     // MARK: - Services
     private let apiService = ThetaAPIService()
     private let continuousSpeechService = ContinuousSpeechService()
+    private let emotionalAnalysisService = EmotionalAnalysisService()
+    private let thetaEdgeAnalysisService = ThetaEdgeAnalysisService()
     
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()
     private var didAutoDebugPrompt = false // ensure we only auto-fire a debug test prompt once
+    private var emotionalAnalysisTimer: Timer?
     
     // MARK: - App State
     enum AppState: Equatable {
@@ -132,14 +139,6 @@ class ChatViewModel: ObservableObject {
                 self?.livePartial = text
             }
             .store(in: &cancellables)
-
-        // Bind last final segment
-        continuousSpeechService.$lastFinalSegment
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] seg in
-                self?.lastFinalSegment = seg
-            }
-            .store(in: &cancellables)
         
         // Bind countdown timer
         continuousSpeechService.$timeUntilNextSend
@@ -149,12 +148,46 @@ class ChatViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
+        // Bind emotional analysis
+        emotionalAnalysisService.$analysis
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] analysis in
+                if let analysis = analysis {
+                    self?.lastAnalysis = "\(analysis.emoji) \(analysis.emotion)"
+                }
+            }
+            .store(in: &cancellables)
+        
         // Setup callback for accumulated text processing
         continuousSpeechService.onTextAccumulated = { [weak self] accumulatedText in
             Task { @MainActor in
                 await self?.processAccumulatedText(accumulatedText)
             }
         }
+        
+        // MARK: - Theta Edge Analysis Service Bindings
+        
+        // Bind analysis service properties
+        thetaEdgeAnalysisService.$lastAnalysis
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] analysis in
+                self?.lastAnalysis = analysis
+            }
+            .store(in: &cancellables)
+        
+        thetaEdgeAnalysisService.$isAnalyzing
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] analyzing in
+                self?.isAnalyzing = analyzing
+            }
+            .store(in: &cancellables)
+        
+        thetaEdgeAnalysisService.$analysisHistory
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] (history: [ThetaEdgeAnalysisService.AnalysisResult]) in
+                self?.analysisHistory = history
+            }
+            .store(in: &cancellables)
     }
     
     private func setupWelcomeMessage() {
@@ -176,6 +209,7 @@ class ChatViewModel: ObservableObject {
         }
         
         continuousSpeechService.startContinuousListening()
+        startEmotionalAnalysisTimer()
         errorMessage = nil
         logger.info("🔄 Started continuous speech recognition")
     }
@@ -184,6 +218,7 @@ class ChatViewModel: ObservableObject {
         guard isListening else { return }
         
         continuousSpeechService.stopContinuousListening()
+        stopEmotionalAnalysisTimer()
         logger.info("🛑 Stopped continuous speech recognition")
     }
     
@@ -213,6 +248,9 @@ class ChatViewModel: ObservableObject {
         logger.info("👤 SENDING TO AI: Processing accumulated text (\(trimmedText.count) chars)")
         logger.info("📝 Full text: '\(trimmedText)'")
         
+        // Send text to Theta Edge Analysis Service for emotional/contextual analysis
+        // thetaEdgeAnalysisService.addTranscribedText(trimmedText)
+        
         // Add user message with accumulated text
         await MainActor.run {
             self.appState = .processing
@@ -239,7 +277,7 @@ class ChatViewModel: ObservableObject {
                 self.messages.append(aiMessage)
                 
                 // ✅ CONFIRM SUCCESSFUL PROCESSING - Now it's safe to clear accumulated text
-                self.continuousSpeechService.confirmTextProcessed()
+                // Note: The continuous speech service manages its own text accumulation
                 
                 // Return to continuous listening state if still listening
                 if self.isListening {
@@ -273,7 +311,6 @@ class ChatViewModel: ObservableObject {
             
             // ❌ HANDLE PROCESSING ERROR - Keep accumulated text for potential retry
             await MainActor.run {
-                self.continuousSpeechService.handleProcessingError()
                 self.handleError(error)
             }
         }
@@ -363,7 +400,48 @@ class ChatViewModel: ObservableObject {
 
     // MARK: - Diagnostics
     func dumpDiagnostics() {
-        logger.info("📊 ChatViewModel diagnostics: livePartial='\(self.livePartial)' lastFinal='\(self.lastFinalSegment)' accumulatedCount=\(self.accumulatedText.count) lastSentLen=\(self.lastSentUserAccumulation.count) messages=\(self.messages.count)")
+        logger.info("📊 ChatViewModel diagnostics: livePartial='\(self.livePartial)' accumulatedCount=\(self.accumulatedText.count) lastSentLen=\(self.lastSentUserAccumulation.count) messages=\(self.messages.count)")
+    }
+
+    // MARK: - Theta Edge Analysis Methods
+    
+    /// Manually trigger analysis of current pending text
+    func triggerAnalysisNow() {
+        thetaEdgeAnalysisService.analyzeNow()
+        logger.info("🧠 Manual analysis triggered")
+    }
+    
+    // MARK: - Emotional Analysis Timer
+    
+    private func startEmotionalAnalysisTimer() {
+        stopEmotionalAnalysisTimer() // Ensure no duplicate timers
+        emotionalAnalysisTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            let textToAnalyze = self.accumulatedText
+            if !textToAnalyze.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Task {
+                    await self.emotionalAnalysisService.analyzeText(textToAnalyze)
+                }
+            }
+        }
+        logger.info("✅ Started emotional analysis timer (30s interval)")
+    }
+    
+    private func stopEmotionalAnalysisTimer() {
+        emotionalAnalysisTimer?.invalidate()
+        emotionalAnalysisTimer = nil
+        logger.info("🛑 Stopped emotional analysis timer")
+    }
+    
+    /// Clear pending analysis text
+    func clearAnalysisText() {
+        thetaEdgeAnalysisService.clearPendingText()
+        logger.info("🗑️ Cleared pending analysis text")
+    }
+    
+    /// Get the most recent analysis result
+    var mostRecentAnalysis: ThetaEdgeAnalysisService.AnalysisResult? {
+        return analysisHistory.last
     }
 
     // MARK: - Debug / Test Utilities

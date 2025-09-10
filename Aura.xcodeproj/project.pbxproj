@@ -7,20 +7,25 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		I1J2K3L4M5N6O7P8Q9R0S1T2 /* EmotionalAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = J2K3L4M5N6O7P8Q9R0S1T2U3 /* EmotionalAnalysisService.swift */; };
 		1A2B3C4D5E6F7890ABCD1234 /* AuraApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3C4D5E6F7890AB12345678 /* AuraApp.swift */; };
 		3C4D5E6F7890ABCD23456789 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5E6F7890ABCD1234567890 /* ContentView.swift */; };
 		5E6F7890ABCD345678901234 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F7890ABCD12345678904567 /* ChatMessage.swift */; };
 		7890ABCD456789012345ABCD /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 890ABCD1567890123456BCDE /* ChatBubbleView.swift */; };
 		90ABCD16789012345678CDEF /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0BCDE278901234567890DEF /* ChatViewModel.swift */; };
 		B0CDE3890123456789012EF0 /* ThetaAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF490123456789012F012 /* ThetaAPIService.swift */; };
+		B1CDE3890123456789012EF1 /* ThetaEdgeAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DEF490123456789012F013 /* ThetaEdgeAnalysisService.swift */; };
 		D0EF5A012345678901234012 /* AudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0F06B123456789012345123 /* AudioService.swift */; };
 		F0017C234567890123456234 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0018D345678901234567345 /* Preview Assets.xcassets */; };
 		F1208D34567890123456CDEF /* ContinuousSpeechService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01319E45678901234567DEFA /* ContinuousSpeechService.swift */; };
+		G2319F56789012345678EFAB /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = H3420G67890123456789FABC /* Config.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		J2K3L4M5N6O7P8Q9R0S1T2U3 /* EmotionalAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmotionalAnalysisService.swift; sourceTree = "<group>"; };
 		0018D345678901234567345 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		01319E45678901234567DEFA /* ContinuousSpeechService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuousSpeechService.swift; sourceTree = "<group>"; };
+		H3420G67890123456789FABC /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		11229E45678901234567845F /* Aura.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aura.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		23AF9B567890123456789567 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		2B3C4D5E6F7890AB12345678 /* AuraApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuraApp.swift; sourceTree = "<group>"; };
@@ -29,6 +34,7 @@
 		890ABCD1567890123456BCDE /* ChatBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
 		A0BCDE278901234567890DEF /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
 		C0DEF490123456789012F012 /* ThetaAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThetaAPIService.swift; sourceTree = "<group>"; };
+		C1DEF490123456789012F013 /* ThetaEdgeAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThetaEdgeAnalysisService.swift; sourceTree = "<group>"; };
 		E0F06B123456789012345123 /* AudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -60,10 +66,13 @@
 				6F7890ABCD12345678904567 /* ChatMessage.swift */,
 				A0BCDE278901234567890DEF /* ChatViewModel.swift */,
 				C0DEF490123456789012F012 /* ThetaAPIService.swift */,
+				C1DEF490123456789012F013 /* ThetaEdgeAnalysisService.swift */,
+				J2K3L4M5N6O7P8Q9R0S1T2U3 /* EmotionalAnalysisService.swift */,
 				E0F06B123456789012345123 /* AudioService.swift */,
 				01319E45678901234567DEFA /* ContinuousSpeechService.swift */,
 				23AF9B567890123456789567 /* Info.plist */,
 				CD205091234567890123450C /* Preview Content */,
+				H3420G67890123456789FABC /* Config.swift */,
 			);
 			path = Aura;
 			sourceTree = "<group>";
@@ -158,6 +167,9 @@
 				7890ABCD456789012345ABCD /* ChatBubbleView.swift in Sources */,
 				90ABCD16789012345678CDEF /* ChatViewModel.swift in Sources */,
 				B0CDE3890123456789012EF0 /* ThetaAPIService.swift in Sources */,
+				B1CDE3890123456789012EF1 /* ThetaEdgeAnalysisService.swift in Sources */,
+				I1J2K3L4M5N6O7P8Q9R0S1T2 /* EmotionalAnalysisService.swift in Sources */,
+				G2319F56789012345678EFAB /* Config.swift in Sources */,
 				D0EF5A012345678901234012 /* AudioService.swift in Sources */,
 				F1208D34567890123456CDEF /* ContinuousSpeechService.swift in Sources */,
 				1A2B3C4D5E6F7890ABCD1234 /* AuraApp.swift in Sources */,
@@ -175,7 +187,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "Aura/Preview\\ Content";
-				DEVELOPMENT_TEAM = NKR6TCB95N;
+				DEVELOPMENT_TEAM = M9439WBFYU;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Aura/Info.plist;
@@ -322,7 +334,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "Aura/Preview\\ Content";
-				DEVELOPMENT_TEAM = NKR6TCB95N;
+				DEVELOPMENT_TEAM = M9439WBFYU;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Aura/Info.plist;

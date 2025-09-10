@@ -30,12 +30,11 @@ struct ContentView: View {
                     // Custom Navigation Header
                     AuraNavigationHeader(
                         isListening: viewModel.isListening,
+                        analysisText: viewModel.lastAnalysis,
                         onClear: { viewModel.clearMessages() },
                         onTestAI: { viewModel.sendTestPrompt() },
                         showDebug: viewModel.debugMode
                     )
-                    
-                    // Removed manual simulator input UI (was here) per updated product direction.
                     
                     // Chat messages area with glass effect
                     ScrollViewReader { proxy in
@@ -102,6 +101,7 @@ struct ContentView: View {
 // MARK: - Aura Navigation Header
 struct AuraNavigationHeader: View {
     let isListening: Bool
+    let analysisText: String
     let onClear: () -> Void
     var onTestAI: (() -> Void)? = nil
     var showDebug: Bool = false
@@ -151,6 +151,20 @@ struct AuraNavigationHeader: View {
             }
             
             Spacer()
+            
+            // Emotional Analysis Display
+            if !analysisText.isEmpty {
+                Text(analysisText)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                    )
+                    .transition(.opacity.combined(with: .scale))
+            }
 
             // Debug button (if enabled)
             if showDebug, let onTestAI = onTestAI {
@@ -194,6 +208,7 @@ struct AuraNavigationHeader: View {
                 .fill(.ultraThinMaterial)
                 .ignoresSafeArea()
         }
+        .animation(.easeInOut, value: analysisText)
     }
 }
 
@@ -376,6 +391,59 @@ struct AuraRecordingInterface: View {
                 .padding(.horizontal, 20)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+            
+            // Latest Analysis Result
+            if !viewModel.lastAnalysis.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "brain.head.profile")
+                            .foregroundColor(auraColor)
+                        Text("Theta Edge Analysis")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(auraColor)
+                        Spacer()
+                        if viewModel.isAnalyzing {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        }
+                    }
+                    
+                    ScrollView {
+                        Text(viewModel.lastAnalysis)
+                            .font(.caption)
+                            .foregroundColor(.primary)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 80)
+                    
+                    if let recentAnalysis = viewModel.mostRecentAnalysis {
+                        HStack {
+                            if let emotionalTone = recentAnalysis.emotionalTone {
+                                Label(emotionalTone, systemImage: "heart")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Text(recentAnalysis.timestamp, style: .time)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(12)
+                .background {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(.ultraThinMaterial)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(auraColor.opacity(0.2), lineWidth: 1)
+                        }
+                }
+                .padding(.horizontal, 20)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
 
             // Live partial + diagnostics (always show when listening for visibility)
             if viewModel.isListening {
@@ -394,10 +462,6 @@ struct AuraRecordingInterface: View {
                     HStack(spacing: 12) {
                         Label("acc \(viewModel.accumulatedText.count)", systemImage: "square.stack.3d.up")
                             .font(.caption2)
-                        if !viewModel.lastFinalSegment.isEmpty {
-                            Label("final \(min(viewModel.lastFinalSegment.count, 40))c", systemImage: "checkmark.seal")
-                                .font(.caption2)
-                        }
                         Label("partial \(viewModel.livePartial.count)", systemImage: "waveform")
                             .font(.caption2)
                         if !viewModel.lastSentUserAccumulation.isEmpty {
@@ -406,6 +470,21 @@ struct AuraRecordingInterface: View {
                         }
                     }
                     .foregroundColor(.secondary)
+                    
+                    // Theta Edge Analysis Status
+                    HStack(spacing: 12) {
+                        Label("analysis: \(viewModel.isAnalyzing ? "running" : "ready")", 
+                              systemImage: viewModel.isAnalyzing ? "brain.head.profile" : "brain")
+                            .font(.caption2)
+                            .foregroundColor(viewModel.isAnalyzing ? .orange : .green)
+                        
+                        if viewModel.analysisHistory.count > 0 {
+                            Label("\(viewModel.analysisHistory.count) analyses", systemImage: "chart.line.uptrend.xyaxis")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
                     if !viewModel.lastSentUserAccumulation.isEmpty {
                         Text("Last sent: \(String(viewModel.lastSentUserAccumulation.prefix(80)))\(viewModel.lastSentUserAccumulation.count > 80 ? "…" : "")")
                             .font(.caption2)

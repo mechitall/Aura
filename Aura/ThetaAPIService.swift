@@ -4,8 +4,49 @@ import os.log
 class ThetaAPIService {
     private let logger = Logger(subsystem: "com.yourcompany.Aura", category: "ThetaAPIService")
     
-    private let apiKey = "mupj6js5y1qn7b6nizpzu0gde80n56b4275xxu1cs5hsfztfii64qj7wthxgkvvk"
+    private let apiKey = Config.shared.thetaAPIKey
     private let baseURL = "https://ondemand.thetaedgecloud.com/infer_request/llama_3_1_70b/completions"
+    
+    // MARK: - API Data Models (for Theta EdgeCloud)
+    
+    // This struct matches the nested "input" object required by the API
+    struct ThetaRequestInput: Codable {
+        let messages: [ThetaMessage]
+        let stream: Bool
+        let temperature: Double
+        let max_tokens: Int
+        let frequency_penalty: Double
+        let top_p: Double
+    }
+    
+    // This is the top-level request object
+    struct ThetaRequest: Codable {
+        let input: ThetaRequestInput
+    }
+    
+    struct ThetaMessage: Codable {
+        let role: String
+        let content: String
+    }
+    
+    // The response from the on-demand API is different from the analysis one
+    struct ThetaResponse: Codable {
+        let status: String
+        let body: ThetaBody
+    }
+    
+    struct ThetaBody: Codable {
+        let infer_requests: [InferenceRequest]
+    }
+    
+    struct InferenceRequest: Codable {
+        let id: String
+        let output: InferenceOutput?
+    }
+    
+    struct InferenceOutput: Codable {
+        let message: String
+    }
     
     // MARK: - Context Management
     private var conversationContext: [ThetaMessage] = []
@@ -117,22 +158,20 @@ class ThetaAPIService {
             throw APIError.invalidURL
         }
         
-    var request = URLRequest(url: url)
-    request.httpMethod = "POST"
-    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    // Explicit Accept header improves clarity for server; ask for event-stream only if streaming enabled
-    request.setValue(useStreaming ? "text/event-stream" : "application/json", forHTTPHeaderField: "Accept")
-    // Defensive: shorter timeout to avoid hanging forever on SSE if server never closes
-    let sessionConfig = URLSessionConfiguration.ephemeral
-    sessionConfig.timeoutIntervalForRequest = 30
-    sessionConfig.timeoutIntervalForResource = 60
-    let session = URLSession(configuration: sessionConfig)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        // Use Bearer token authorization as required by the on-demand endpoint
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         
-        // Use enhanced context management
+        let sessionConfig = URLSessionConfiguration.ephemeral
+        sessionConfig.timeoutIntervalForRequest = 30
+        sessionConfig.timeoutIntervalForResource = 60
+        let session = URLSession(configuration: sessionConfig)
+        
         let apiMessages = manageContext(messages)
-
-        // Find the very last user message (what we expect to have just been sent)
+        
         if let lastUser = messages.last(where: { $0.role.isUser }) {
             let preview = String(lastUser.text.prefix(120))
             logger.info("📌 Last user message going into request: len=\(lastUser.text.count) preview='\(preview)'")
@@ -140,22 +179,23 @@ class ThetaAPIService {
             logger.warning("⚠️ No user message found when preparing request body")
         }
         
-        let requestBody = ThetaRequest(
-            input: ThetaRequestInput(
-                messages: apiMessages,
-                max_tokens: 400,
-                temperature: 0.75,
-                stream: useStreaming, // now configurable
-                top_p: 0.9,
-                frequency_penalty: 0.1
-            )
+        // Create the nested input object
+        let requestInput = ThetaRequestInput(
+            messages: apiMessages,
+            stream: useStreaming,
+            temperature: 0.75,
+            max_tokens: 400,
+            frequency_penalty: 0.1,
+            top_p: 0.9 // A standard value for top_p
         )
+        
+        // Wrap the input object in the main request body
+        let requestBody = ThetaRequest(input: requestInput)
         
         do {
             let jsonData = try JSONEncoder().encode(requestBody)
             request.httpBody = jsonData
             
-            // Debug: Log the actual request being sent
             if let jsonString = String(data: jsonData, encoding: .utf8) {
                 logger.info("📤 Request JSON: \(jsonString)")
             }
@@ -171,13 +211,15 @@ class ThetaAPIService {
             
             logger.info("📥 AI insight response status: \(httpResponse.statusCode)")
             
+            let rawBody = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+            logger.info("📄 Raw AI response body: \(rawBody)")
+
             if httpResponse.statusCode != 200 {
-                let rawBody = String(data: data, encoding: .utf8) ?? "<non-utf8>"
                 logger.error("💥 Theta EdgeCloud API error status=\(httpResponse.statusCode) body='\(rawBody.prefix(500))'")
                 if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                     logger.error("🔐 Authentication / authorization failure. Verify API key is valid & not expired.")
                 } else if httpResponse.statusCode == 404 {
-                    logger.error("❓ Endpoint not found – confirm model path /infer_request/llama_3_1_70b/completions is correct for current Theta deployment.")
+                    logger.error("❓ Endpoint not found – confirm model path /infer_request/deepseek_r1/completions is correct for current Theta deployment.")
                 } else if httpResponse.statusCode >= 500 {
                     logger.error("🛠️ Server-side error – may retry after delay.")
                 }
@@ -191,15 +233,21 @@ class ThetaAPIService {
             // If streaming disabled just parse as normal JSON directly
             if !useStreaming {
                 do {
-                    return try parseStreamingResponse(responseString: responseString)
-                } catch {
-                    logger.warning("⚠️ Non-stream parse failed, attempting direct JSON decode fallback")
-                    if let data = responseString.data(using: .utf8),
-                       let fallback = try? JSONDecoder().decode(ThetaResponse.self, from: data),
-                       let content = (fallback.choices.first?.message ?? fallback.choices.first?.delta)?.content {
-                        return content
+                    let thetaResponse = try JSONDecoder().decode(ThetaResponse.self, from: data)
+                    
+                    guard let firstRequest = thetaResponse.body.infer_requests.first,
+                          let output = firstRequest.output else {
+                        logger.error("💥 Could not find inference output in response")
+                        throw APIError.noResponse
                     }
-                    throw error
+                    
+                    return output.message
+                } catch {
+                    logger.error("💥 JSON parsing failed: \(error)")
+                    if let responseBody = String(data: data, encoding: .utf8) {
+                        logger.error("💥 Full response data that failed to parse: '\(responseBody)'")
+                    }
+                    throw APIError.decodingError(error)
                 }
             } else {
                 return try parseStreamingResponse(responseString: responseString)
@@ -254,12 +302,8 @@ class ThetaAPIService {
                     do {
                         let streamResponse = try JSONDecoder().decode(ThetaResponse.self, from: jsonData)
                         
-                        if let firstChoice = streamResponse.choices.first {
-                            if let delta = firstChoice.delta {
-                                fullResponse += delta.content
-                            } else if let message = firstChoice.message {
-                                fullResponse += message.content
-                            }
+                        if let message = streamResponse.body.infer_requests.first?.output?.message {
+                            fullResponse += message
                         }
                     } catch {
                         logger.error("💥 Failed to parse streaming JSON chunk: \(error)")
@@ -288,10 +332,10 @@ class ThetaAPIService {
             do {
                 let response = try JSONDecoder().decode(ThetaResponse.self, from: data)
                 
-                if let firstChoice = response.choices.first {
-                    let message = firstChoice.message ?? ThetaResponseMessage(content: "")
-                    logger.info("✅ Theta EdgeCloud insight successful (JSON): \(message.content.prefix(100))...")
-                    return message.content
+                if let firstRequest = response.body.infer_requests.first,
+                   let output = firstRequest.output {
+                    logger.info("✅ Theta EdgeCloud insight successful (JSON): \(output.message.prefix(100))...")
+                    return output.message
                 } else {
                     logger.error("❌ No response choices received from Theta EdgeCloud")
                     throw APIError.noResponse
@@ -303,46 +347,4 @@ class ThetaAPIService {
             }
         }
     }
-}
-
-// MARK: - Request/Response Models
-struct ThetaRequest: Codable {
-    let input: ThetaRequestInput
-}
-
-struct ThetaRequestInput: Codable {
-    let messages: [ThetaMessage]
-    let max_tokens: Int
-    let temperature: Double
-    let stream: Bool
-    let top_p: Double?
-    let frequency_penalty: Double?
-    
-    init(messages: [ThetaMessage], max_tokens: Int, temperature: Double, stream: Bool, top_p: Double? = nil, frequency_penalty: Double? = nil) {
-        self.messages = messages
-        self.max_tokens = max_tokens
-        self.temperature = temperature
-        self.stream = stream
-        self.top_p = top_p
-        self.frequency_penalty = frequency_penalty
-    }
-}
-
-struct ThetaMessage: Codable {
-    let role: String
-    let content: String
-}
-
-struct ThetaResponse: Codable {
-    let choices: [ThetaChoice]
-}
-
-struct ThetaChoice: Codable {
-    let index: Int?
-    let message: ThetaResponseMessage?
-    let delta: ThetaResponseMessage?
-}
-
-struct ThetaResponseMessage: Codable {
-    let content: String
 }

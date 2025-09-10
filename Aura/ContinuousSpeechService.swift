@@ -18,21 +18,12 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
     private let logger = Logger(subsystem: "com.yourcompany.Aura", category: "ContinuousSpeechService")
     
     // MARK: - Configuration
-    // Reduced interval so user gets responses faster (was 60s)
-    private let accumulationInterval: TimeInterval = 30.0 // send roughly every 30s
-    private let speechConfidenceThreshold: Float = 0.15 // Slightly lower to capture more words
-    private let maxSessionDuration: TimeInterval = 55.0 // Slightly under 60s to avoid iOS limits
-    // New heuristics for immediate sentence-based sending
-    private let minSentenceSendChars: Int = 40 // minimum accumulated chars before sending on punctuation
-    private let minSecondsBetweenAutoSends: TimeInterval = 8.0 // debounce for auto sentence sends
-    private let largeChunkImmediateThreshold: Int = 120 // existing large accumulation trigger
-
-    // Response strategy (future flexibility)
-    enum ResponseStrategy {
-        case intervalOnly      // Only timer / large chunk
-        case sentenceOrInterval // Sentence punctuation OR timer (default)
-    }
-    var responseStrategy: ResponseStrategy = .sentenceOrInterval
+    private let accumulationInterval: TimeInterval = 60.0 // 1 minute
+    private let silenceThreshold: TimeInterval = 2.5 // Stop after 2.5 seconds of silence
+    private let minimumSpeechDuration: TimeInterval = 0.8 // Minimum speech to consider
+    private let noiseFloor: Float = -50.0 // dB threshold for meaningful audio
+    private let speechConfidenceThreshold: Float = 0.3 // Minimum confidence for speech
+    private let maxSessionDuration: TimeInterval = 30.0 // Max single session duration
     
     // MARK: - Speech Recognition Properties
     private var speechRecognizer: SFSpeechRecognizer?
@@ -42,7 +33,8 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
     // MARK: - Audio Properties
     private var audioEngine = AVAudioEngine()
     private var accumulationTimer: Timer?
-    private var sessionRestartTimer: Timer?
+    private var silenceTimer: Timer?
+    private var lastSpeechTime: Date?
     
     // MARK: - Published Properties
     @Published var isListening = false
@@ -51,8 +43,6 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
     @Published var currentSessionText = ""
     @Published var recordingLevel: Float = 0.0
     @Published var timeUntilNextSend: TimeInterval = 0
-    // Diagnostics
-    @Published var lastFinalSegment: String = ""
     
     // MARK: - Callbacks
     var onTextAccumulated: ((String) -> Void)?
@@ -63,11 +53,10 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
     private var sessionStartTime: Date?
     private var currentSessionStartTime: Date?
     private var averageAudioLevel: Float = 0.0
+    private var speechActivity: Bool = false
+    private var consecutiveSilenceCount: Int = 0
+    private var lastMeaningfulSpeechTime: Date?
     private var autoStarted: Bool = false
-    private var isProcessingText = false
-    private var lastAutoTriggerTime: Date?
-    private var consecutiveNoSpeechErrors: Int = 0
-    private var nextRetryDelay: TimeInterval = 1.0
     
     override init() {
         super.init()
@@ -263,11 +252,11 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
         
         isListening = false
         
-        // Stop all timers
+        // Stop timers
         accumulationTimer?.invalidate()
         accumulationTimer = nil
-        sessionRestartTimer?.invalidate()
-        sessionRestartTimer = nil
+        silenceTimer?.invalidate()
+        silenceTimer = nil
         
         // Stop current recognition session
         stopCurrentSession()
@@ -312,51 +301,23 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
     }
     
     private func processAccumulatedText() {
-        guard !accumulatedText.isEmpty && !isProcessingText else {
-            if isProcessingText {
-                logger.info("⏳ Already processing text, skipping...")
-            } else {
-                logger.info("ℹ️ No accumulated text to process")
-            }
+        guard !accumulatedText.isEmpty else {
+            logger.info("ℹ️ No accumulated text to process")
             return
         }
         
         let textToProcess = accumulatedText
         logger.info("📤 Processing accumulated text (\(textToProcess.count) chars): \(String(textToProcess.prefix(100)))...")
         
-        // Mark as processing - DO NOT clear text yet
-        isProcessingText = true
-        logger.info("🔒 Marked text as processing - waiting for confirmation")
+        // Clear accumulated text
+        accumulatedText = ""
+        speechSegments.removeAll()
         
         // Send to callback
         onTextAccumulated?(textToProcess)
         
         // Reset timer
         sessionStartTime = Date()
-    }
-    
-    // Called by ChatViewModel when AI processing completes successfully
-    func confirmTextProcessed() {
-        logger.info("✅ CONFIRMING TEXT PROCESSING COMPLETE")
-        
-        guard isProcessingText else {
-            logger.warning("⚠️ Attempted to confirm when no text was being processed")
-            return
-        }
-        
-        // NOW clear accumulated data after successful processing
-        accumulatedText = ""
-        speechSegments.removeAll()
-        isProcessingText = false
-        
-        logger.info("🧹 Cleared accumulated data after successful AI processing")
-    }
-    
-    // Called by ChatViewModel if AI processing fails
-    func handleProcessingError() {
-        logger.error("❌ AI PROCESSING FAILED - keeping accumulated text for retry")
-        isProcessingText = false
-        logger.info("🔓 Unlocked processing state, keeping text: '\(String(self.accumulatedText.prefix(50)))...'")
     }
     
     private func startListeningSession() {
@@ -406,6 +367,7 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
                     
                     Task { @MainActor in
                         self?.updateRecordingLevel(from: buffer)
+                        self?.detectSpeechActivity(from: buffer)
                     }
                 }
             }
@@ -424,10 +386,18 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
             
             isCurrentlyRecognizing = true
             currentSessionStartTime = Date()
-            logger.info("✅ Continuous speech recognition session started (no silence detection)")
+            logger.info("✅ Speech recognition session started")
             
-            // Schedule automatic session restart to maintain continuous operation
-            scheduleSessionRestart()
+            // Add session timeout
+            DispatchQueue.main.asyncAfter(deadline: .now() + maxSessionDuration) {
+                if self.isCurrentlyRecognizing && self.currentSessionStartTime != nil {
+                    let sessionDuration = Date().timeIntervalSince(self.currentSessionStartTime!)
+                    if sessionDuration >= self.maxSessionDuration {
+                        self.logger.info("⏰ Session timeout reached, restarting")
+                        self.restartSessionIfNeeded()
+                    }
+                }
+            }
             
         } catch {
             logger.error("❌ Failed to start listening session: \(error)")
@@ -463,18 +433,8 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
     private func handleRecognitionResult(result: SFSpeechRecognitionResult?, error: Error?) {
         if let error = error {
             logger.error("Speech recognition error: \(error.localizedDescription)")
-            if error.localizedDescription.contains("No speech detected") {
-                self.consecutiveNoSpeechErrors += 1
-                self.nextRetryDelay = min(5.0, self.nextRetryDelay * 1.3)
-                if self.consecutiveNoSpeechErrors == 3 {
-                    self.logger.warning("🤔 Detected repeated 'No speech detected' errors. If you're in Simulator enable 'Audio Input > Mac Microphone'.")
-                }
-            } else {
-                self.consecutiveNoSpeechErrors = 0
-                self.nextRetryDelay = 1.0
-            }
-            let delay = self.nextRetryDelay
-            self.logger.info("🔄 Restarting recognition after delay=\(String(format: "%.2f", delay))s (noSpeechErrors=\(self.consecutiveNoSpeechErrors))")
+            // Restart session after error with exponential backoff
+            let delay = min(8.0, pow(2.0, Double(consecutiveSilenceCount)))
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 if self.isListening {
                     self.startListeningSession()
@@ -485,100 +445,61 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
         
         guard let result = result else { return }
         
-        let transcription = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
+        let transcription = result.bestTranscription.formattedString
         let confidence = result.bestTranscription.segments.map { $0.confidence }.reduce(0, +) / Float(max(1, result.bestTranscription.segments.count))
         
-        // Always update current session text (for UI display)
         currentSessionText = transcription
         
         if result.isFinal {
-            logger.info("✅ Final transcription (confidence: \(String(format: "%.2f", confidence))): \(transcription)")
+            logger.info("✅ Final transcription segment (confidence: \(confidence)): \(transcription)")
             
-            // Add ALL final text to accumulation (no silence detection)
+            // Add to accumulated text if meaningful and confident enough
             let cleanedText = cleanTranscription(transcription)
-            if !cleanedText.isEmpty && confidence >= speechConfidenceThreshold {
-                appendToAccumulation(cleanedText)
-                lastFinalSegment = cleanedText
-                logger.info("📝 Final segment accumulated: \(cleanedText) (Total: \(self.accumulatedText.count) chars)")
-
-                let endsWithPunctuation = cleanedText.last.map { [".", "?", "!"].contains(String($0)) } ?? false
-
-                // Large chunk trigger (existing behavior but now uses constant)
-                if self.accumulatedText.count >= self.largeChunkImmediateThreshold && self.canAutoTrigger() {
-                    logger.info("⚡ Immediate processing: large accumulated chunk (\(self.accumulatedText.count) chars >= \(self.largeChunkImmediateThreshold))")
-                    self.processAccumulatedText()
+            if isValidSpeech(cleanedText, confidence: confidence) {
+                if !accumulatedText.isEmpty {
+                    accumulatedText += " "
                 }
-                // Sentence-ending trigger (if strategy allows and length threshold met)
-                else if self.responseStrategy == .sentenceOrInterval && endsWithPunctuation && self.accumulatedText.count >= self.minSentenceSendChars && self.canAutoTrigger() {
-                    logger.info("⚡ Immediate processing: sentence end detected ('\(cleanedText.suffix(1))') with accumulated=\(self.accumulatedText.count) chars")
-                    self.processAccumulatedText()
-                }
+                accumulatedText += cleanedText
+                speechSegments.append(cleanedText)
+                lastMeaningfulSpeechTime = Date()
+                consecutiveSilenceCount = 0
+                
+                logger.info("📝 Added to accumulation: \(cleanedText) (Total: \(self.accumulatedText.count) chars)")
             }
-
-            // Clear current session text after adding to accumulation
+            
+            // Clear current session text
             currentSessionText = ""
+            
+            // Start silence timer
+            startSilenceTimer()
         } else {
-            // Show partial results in UI and opportunistically accumulate stable trailing portion
-            logger.debug("🔄 Partial: \(transcription) (conf: \(String(format: "%.2f", confidence)))")
-            accumulateStablePartial(result: result, confidence: confidence)
+            // Reset silence timer on partial results if they seem meaningful
+            if !transcription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && confidence > speechConfidenceThreshold {
+                lastSpeechTime = Date()
+                silenceTimer?.invalidate()
+            }
         }
     }
-
-    // Append text safely to accumulation
-    private func appendToAccumulation(_ text: String) {
-        if !accumulatedText.isEmpty { accumulatedText += " " }
-        accumulatedText += text
-        speechSegments.append(text)
-        logger.debug("ACCUM += (total=\(self.accumulatedText.count)) last='\(text)'")
-    }
-
-    // Debounce auto triggers
-    private func canAutoTrigger() -> Bool {
-        if isProcessingText { return false }
-        let now = Date()
-        if let last = lastAutoTriggerTime, now.timeIntervalSince(last) < minSecondsBetweenAutoSends { return false }
-        lastAutoTriggerTime = now
-        return true
-    }
-
-    // Heuristic: accumulate partial text segments that are unlikely to change dramatically.
-    // We look at the last transcription segment; if its duration/length passes thresholds we treat it as stable.
-    private func accumulateStablePartial(result: SFSpeechRecognitionResult, confidence: Float) {
-        guard confidence >= speechConfidenceThreshold else { return }
-        let transcription = result.bestTranscription
-        guard let lastSegment = transcription.segments.last else { return }
-        // Only accumulate if segment ended > 0.8s ago to reduce duplication while text still mutating
-    // SFTranscription doesn't expose a global start timestamp; approximate stability by segment duration only.
-    // If the last segment is reasonably long, treat it as stable after a short delay since partial updates stopped.
-    if lastSegment.duration < 0.25 { return } // ignore extremely short noises
-        let segmentText = cleanTranscription(lastSegment.substring)
-        guard !segmentText.isEmpty else { return }
-        // Avoid re-adding if it already appears at end
-        if !accumulatedText.hasSuffix(segmentText) && !currentSessionText.hasSuffix(segmentText) {
-            appendToAccumulation(segmentText)
-            // Do not overwrite lastFinalSegment here; partials are tentative
-            logger.info("✏️ Partial segment locked-in: \(segmentText)")
-        }
-    }
-
-    // MARK: - Diagnostics
-    func snapshotDiagnostics(reason: String = "manual") {
-        logger.info("🧪 Diagnostics snapshot (")
-        logger.info("🧪 reason=\(reason) isListening=\(self.isListening) hasPermission=\(self.hasPermission) recognizerActive=\(self.isCurrentlyRecognizing)")
-        logger.info("🧪 currentSessionText='\(self.currentSessionText)' accumulated='\(String(self.accumulatedText.prefix(120)))' chars=\(self.accumulatedText.count)")
-        logger.info("🧪 lastFinal='\(self.lastFinalSegment)' segments=\(self.speechSegments.count) processing=\(self.isProcessingText)")
-    }
     
-    // MARK: - Session Management (Continuous without silence detection)
-    
-    private func scheduleSessionRestart() {
-        // Restart sessions every ~50 seconds to stay within iOS limits but maintain continuity
-        sessionRestartTimer?.invalidate()
-        sessionRestartTimer = Timer.scheduledTimer(withTimeInterval: maxSessionDuration, repeats: false) { [weak self] _ in
+    private func startSilenceTimer() {
+        silenceTimer?.invalidate()
+        silenceTimer = Timer.scheduledTimer(withTimeInterval: silenceThreshold, repeats: false) { [weak self] _ in
             Task { @MainActor in
-                if self?.isListening == true {
-                    self?.logger.info("🔄 Restarting session for continuous operation (no silence detection)")
-                    self?.startListeningSession()
+                self?.handleSilenceDetected()
+            }
+        }
+    }
+    
+    private func handleSilenceDetected() {
+        consecutiveSilenceCount += 1
+        logger.info("🔇 Silence detected (count: \(self.consecutiveSilenceCount)), restarting recognition session")
+        
+        if isListening {
+            // Restart the listening session for continuous operation
+            let delay = min(2.0, 0.5 + Double(consecutiveSilenceCount) * 0.2)
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                if self.isListening {
+                    self.startListeningSession()
                 }
             }
         }
@@ -615,37 +536,49 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
         return 0.0
     }
     
-    // MARK: - Text Processing (Permissive for continuous transcription)
+    // MARK: - Enhanced Speech Processing
+    private func detectSpeechActivity(from buffer: AVAudioPCMBuffer) {
+        guard let floatData = buffer.floatChannelData else { return }
+        
+        let channelDataValue = floatData.pointee
+        let samples = Array(UnsafeBufferPointer(start: channelDataValue, count: Int(buffer.frameLength)))
+        
+        // Calculate RMS and detect speech activity
+        let rms = sqrt(samples.map { $0 * $0 }.reduce(0, +) / Float(samples.count))
+        let dbLevel = rms > 0 ? 20 * log10(rms) : -160.0
+        
+        speechActivity = dbLevel > noiseFloor
+    }
     
     private func cleanTranscription(_ text: String) -> String {
         let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // Minimal cleaning - keep most speech patterns for continuous transcription
-        // Only remove excessive repetitive noise
-        let excessiveNoise = ["um um", "uh uh", "hmm hmm", "ah ah"]
+        // Remove common false positives and noise
+        let noisePhrases = ["um", "uh", "hmm", "mm", "ah", "er", "..."]
         var result = cleaned
         
-        for phrase in excessiveNoise {
-            result = result.replacingOccurrences(of: phrase, with: phrase.components(separatedBy: " ").first ?? "", options: .caseInsensitive)
+        for phrase in noisePhrases {
+            result = result.replacingOccurrences(of: "\\b\(phrase)\\b", with: "", options: [.regularExpression, .caseInsensitive])
         }
         
-        // Clean up extra whitespace but preserve single spaces
-        result = result.replacingOccurrences(of: "\\s{2,}", with: " ", options: .regularExpression)
+        // Clean up extra whitespace
+        result = result.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     private func isValidSpeech(_ text: String, confidence: Float) -> Bool {
         let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // Very permissive validation for continuous transcription
-        guard !cleanText.isEmpty else { return false }
+        // Check minimum length and confidence
+        guard cleanText.count >= 2, confidence >= speechConfidenceThreshold else {
+            return false
+        }
         
-        // Accept almost everything with minimal confidence threshold
-        guard confidence >= speechConfidenceThreshold else { return false }
-        
-        // Only reject if entirely non-alphabetic (keep mixed content)
+        // Reject if mostly numbers or symbols
         let letterCount = cleanText.filter { $0.isLetter }.count
-        return letterCount > 0 || cleanText.count >= 3 // Allow short words or any text with letters
+        let totalCount = cleanText.count
+        
+        return Double(letterCount) / Double(totalCount) >= 0.5
     }
     
     // MARK: - Public Methods
