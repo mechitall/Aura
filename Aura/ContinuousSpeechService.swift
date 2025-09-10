@@ -595,6 +595,15 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
         accumulatedText = text
     }
     
+    func appendTextForTesting(_ text: String) {
+        Task { @MainActor in
+            self.currentSessionText += text
+            self.accumulatedText += text
+            self.onTextAccumulated?(self.accumulatedText)
+            self.startSilenceTimer()
+        }
+    }
+    
     private func restartSessionIfNeeded() {
         guard isListening else { return }
         

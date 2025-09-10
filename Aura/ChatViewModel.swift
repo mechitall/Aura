@@ -456,4 +456,8 @@ class ChatViewModel: ObservableObject {
         }
         Task { await getAIResponse() }
     }
+    
+    func appendText(_ text: String) {
+        continuousSpeechService.appendTextForTesting(text)
+    }
 }

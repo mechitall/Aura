@@ -320,6 +320,7 @@ struct AuraRecordingInterface: View {
     let screenWidth: CGFloat
     @State private var pulseScale: CGFloat = 1.0
     @State private var breathingScale: CGFloat = 1.0
+    @State private var debugText: String = ""
     
     var body: some View {
         VStack(spacing: 20) {
@@ -678,6 +679,19 @@ struct AuraRecordingInterface: View {
                 }
             }
             .padding(.bottom, 8)
+            
+            // Debug controls
+            if viewModel.debugMode {
+                HStack {
+                    TextField("Append text...", text: $debugText)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                    Button("Append") {
+                        viewModel.appendText(debugText)
+                        debugText = ""
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 40)
