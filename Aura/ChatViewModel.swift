@@ -30,6 +30,7 @@ class ChatViewModel: ObservableObject {
     @Published var debugMode: Bool = true // Enable debug utilities (can be toggled off for production)
     @Published var lastAnalysis: EmotionalAnalysis?
     @Published var isAnalyzing: Bool = false
+    @Published var emotionalTrend: [EmotionalPoint] = [] // history for emotional trend visualization
     
     // MARK: - Services
     private let apiService = ThetaAPIService()
@@ -42,6 +43,16 @@ class ChatViewModel: ObservableObject {
     private var emotionalAnalysisTimer: Timer?
     private let emotionalAnalysisInterval: TimeInterval = 30.0
     @Published var lastEmotionalAnalysisAt: Date? = nil
+    @Published var timeUntilNextEmotionalAnalysis: TimeInterval = 0
+    private var emotionalCountdownTimer: Timer?
+    
+    struct EmotionalPoint: Identifiable, Hashable {
+        let id = UUID()
+        let date: Date
+        let emotion: String
+        let emoji: String
+        let score: Double // -1 (negative) ... +1 (positive)
+    }
     
     // MARK: - App State
     enum AppState: Equatable {
@@ -66,6 +77,8 @@ class ChatViewModel: ObservableObject {
     
     // MARK: - Initialization
     init() {
+    // Default emotional state so UI always shows something
+    self.lastAnalysis = EmotionalAnalysis(emotion: "Neutral", emoji: "😐")
         setupBindings()
         setupWelcomeMessage()
         
@@ -150,7 +163,15 @@ class ChatViewModel: ObservableObject {
         emotionalAnalysisService.$analysis
             .receive(on: DispatchQueue.main)
             .sink { [weak self] analysis in
-                self?.lastAnalysis = analysis
+                guard let self = self else { return }
+                self.lastAnalysis = analysis
+                if let analysis = analysis {
+                    let point = EmotionalPoint(date: Date(), emotion: analysis.emotion, emoji: analysis.emoji, score: self.score(for: analysis.emotion))
+                    self.emotionalTrend.append(point)
+                    if self.emotionalTrend.count > 120 { // keep roughly last hour at 30s cadence + manual
+                        self.emotionalTrend.removeFirst(self.emotionalTrend.count - 120)
+                    }
+                }
             }
             .store(in: &cancellables)
         
@@ -415,22 +436,28 @@ class ChatViewModel: ObservableObject {
         stopEmotionalAnalysisTimer() // Ensure no duplicate timers
         let fireInterval = emotionalAnalysisInterval
         emotionalAnalysisTimer = Timer.scheduledTimer(withTimeInterval: fireInterval, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            let textToAnalyze = self.emotionalAnalysisSnapshot()
-            if !textToAnalyze.isEmpty && !self.isAnalyzing {
-                self.isAnalyzing = true
-                Task { @MainActor in
-                    await self.emotionalAnalysisService.analyzeText(textToAnalyze)
-                    self.isAnalyzing = false
-                    self.lastEmotionalAnalysisAt = Date()
-                }
-            } else if self.isAnalyzing {
-                self.logger.info("⏱️ Skipping timer run (analysis already in progress)")
-            } else {
-                self.logger.info("⏱️ Timer emotional analysis skipped (no snapshot text)")
-            }
+            self?.performScheduledEmotionalAnalysis()
         }
-        logger.info("✅ Started emotional analysis timer (\(Int(fireInterval))s interval)")
+        logger.info("✅ Started emotional analysis timer (\(Int(fireInterval))s interval) with immediate first run")
+        // Fire first analysis immediately so UI has an initial neutral/real state
+        performScheduledEmotionalAnalysis()
+    startEmotionalCountdown()
+    }
+
+    private func performScheduledEmotionalAnalysis() {
+        guard !isAnalyzing else {
+            logger.info("⏱️ Skipping scheduled analysis; one already running")
+            return
+        }
+        let textToAnalyze = emotionalAnalysisSnapshot()
+        // Always run (even if empty) so UI keeps updating; service defaults to Neutral for empty text
+        isAnalyzing = true
+        Task { @MainActor in
+            await self.emotionalAnalysisService.analyzeText(textToAnalyze)
+            self.isAnalyzing = false
+            self.lastEmotionalAnalysisAt = Date()
+            self.updateEmotionalCountdown()
+        }
     }
 
     private func restartEmotionalAnalysisTimer() {
@@ -442,6 +469,8 @@ class ChatViewModel: ObservableObject {
         emotionalAnalysisTimer?.invalidate()
         emotionalAnalysisTimer = nil
         logger.info("🛑 Stopped emotional analysis timer")
+    emotionalCountdownTimer?.invalidate()
+    emotionalCountdownTimer = nil
     }
     
     /// Clear pending analysis text
@@ -452,6 +481,11 @@ class ChatViewModel: ObservableObject {
     /// Get the most recent analysis result
     var mostRecentAnalysis: EmotionalAnalysis? {
         return self.lastAnalysis
+    }
+
+    // Always-present analysis (falls back to Neutral)
+    var currentAnalysis: EmotionalAnalysis {
+        lastAnalysis ?? EmotionalAnalysis(emotion: "Neutral", emoji: "😐")
     }
 
     // MARK: - Debug / Test Utilities
@@ -485,5 +519,44 @@ class ChatViewModel: ObservableObject {
         // Keep the most recent portion (suffix) to reflect current emotional state
         let truncated = String(combined.suffix(maxLength))
         return truncated
+    }
+
+    // MARK: - Emotional Countdown Helpers
+    private func startEmotionalCountdown() {
+        emotionalCountdownTimer?.invalidate()
+        emotionalCountdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateEmotionalCountdown()
+        }
+        updateEmotionalCountdown()
+    }
+    private func updateEmotionalCountdown() {
+        guard let last = lastEmotionalAnalysisAt else {
+            timeUntilNextEmotionalAnalysis = 0
+            return
+        }
+        let elapsed = Date().timeIntervalSince(last)
+        let remaining = emotionalAnalysisInterval - elapsed
+        timeUntilNextEmotionalAnalysis = max(0, remaining)
+    }
+
+    // MARK: - Emotion Scoring
+    private func score(for emotion: String) -> Double {
+        let key = emotion.lowercased()
+        let mapping: [String: Double] = [
+            "ecstatic": 1.0,
+            "happy": 0.8,
+            "confident": 0.6,
+            "calm": 0.4,
+            "neutral": 0.0,
+            "logical": 0.1,
+            "analytical": 0.1,
+            "emotional": 0.0,
+            "stressed": -0.3,
+            "anxious": -0.5,
+            "sad": -0.6,
+            "heartbroken": -0.8,
+            "depressed": -0.9
+        ]
+        return mapping[key] ?? 0.0
     }
 }

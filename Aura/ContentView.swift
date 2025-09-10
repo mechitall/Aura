@@ -62,20 +62,22 @@ struct CleanAuraView: View {
                 
                 VStack(spacing: 40) {
                     Spacer()
-                    // Emotional State (if available)
-                    if let analysis = viewModel.lastAnalysis {
-                        VStack(spacing: 4) {
-                            Text(analysis.emoji)
-                                .font(.system(size: 80))
-                                .transition(.scale.combined(with: .opacity))
-                            Text(analysis.emotion)
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.primary)
-                                .transition(.opacity)
-                        }
-                        .padding(.horizontal, 32)
+                    // Emotional State (always displayed)
+                    let analysis = viewModel.currentAnalysis
+                    VStack(spacing: 4) {
+                        Text(analysis.emoji)
+                            .font(.system(size: 80))
+                            .transition(.scale.combined(with: .opacity))
+                        Text(analysis.emotion)
+                            .font(.title3)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                            .transition(.opacity)
+                        EmotionalTrendBar(points: viewModel.emotionalTrend)
+                            .frame(height: 60)
+                            .padding(.top, 8)
                     }
+                    .padding(.horizontal, 32)
                     
                     // Main listening control with rings
                     ZStack {
@@ -192,20 +194,22 @@ struct DebugView: View {
                         onEmotionalAnalysis: { viewModel.triggerAnalysisNow() },
                         showDebug: viewModel.debugMode
                     )
-                    if let analysis = viewModel.lastAnalysis {
-                        VStack {
-                            Text(analysis.emoji)
-                                .font(.system(size: 60))
-                            Text(analysis.emotion)
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                        }
-                        .padding()
-                        .background(Color.black.opacity(0.3))
-                        .cornerRadius(20)
-                        .transition(.opacity.combined(with: .scale))
+                    let analysis = viewModel.currentAnalysis
+                    VStack {
+                        Text(analysis.emoji)
+                            .font(.system(size: 60))
+                        Text(analysis.emotion)
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                        EmotionalTrendBar(points: viewModel.emotionalTrend)
+                            .frame(height: 50)
+                            .padding(.top, 6)
                     }
+                    .padding()
+                    .background(Color.black.opacity(0.3))
+                    .cornerRadius(20)
+                    .transition(.opacity.combined(with: .scale))
                     ScrollViewReader { proxy in
                         ScrollView {
                             LazyVStack(spacing: 16) {
@@ -719,10 +723,15 @@ struct AuraRecordingInterface: View {
                 Image(systemName: "timer")
                     .font(.caption)
                     .foregroundColor(auraColor)
-                Text("Next send: \(Int(viewModel.timeUntilNextSend))s")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(auraColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Next send: \(Int(viewModel.timeUntilNextSend))s")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(auraColor)
+                    Text("Next emotion: \(Int(viewModel.timeUntilNextEmotionalAnalysis))s")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -916,6 +925,64 @@ struct AuraWaveformView: View {
             let newValue = (baseLevel * randomVariation + animationValues[i]) / 2
             animationValues[i] = max(0.1, min(1.0, newValue))
         }
+    }
+}
+
+// MARK: - Emotional Trend Bar
+struct EmotionalTrendBar: View {
+    let points: [ChatViewModel.EmotionalPoint]
+    
+    private func color(for score: Double) -> Color {
+        switch score {
+        case let x where x >= 0.7: return .green
+        case 0.3..<0.7: return .mint
+        case 0.05..<0.3: return .teal
+        case -0.2..<0.05: return .gray
+        case -0.5 ..< -0.2: return .orange
+        case -0.8 ..< -0.5: return .red
+        default: return .purple
+        }
+    }
+    
+    private func height(for score: Double, in total: CGFloat) -> CGFloat {
+        // Map -1...+1 to 0...1 then scale by total
+        let normalized = (score + 1.0) / 2.0
+        return max(4, normalized * total)
+    }
+    
+    var body: some View {
+        GeometryReader { geo in
+            let barWidth = max(2, geo.size.width / CGFloat(max(points.count, 1)))
+            HStack(alignment: .bottom, spacing: 2) {
+                ForEach(points) { point in
+                    VStack(spacing: 2) {
+                        ZStack(alignment: .bottom) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(color(for: point.score).opacity(0.25))
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(color(for: point.score))
+                                .frame(height: height(for: point.score, in: geo.size.height - 16))
+                        }
+                        .frame(width: barWidth, height: geo.size.height - 20)
+                        Text(point.emoji)
+                            .font(.system(size: 10))
+                            .frame(height: 14)
+                    }
+                    .accessibilityLabel("Emotion \(point.emotion)")
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .animation(.easeInOut(duration: 0.4), value: points.count)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
