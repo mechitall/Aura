@@ -28,22 +28,20 @@ class ChatViewModel: ObservableObject {
     @Published var livePartial: String = "" // live partial transcription (currentSessionText)
     @Published var lastSentUserAccumulation: String = "" // EXACT text block most recently sent to AI
     @Published var debugMode: Bool = true // Enable debug utilities (can be toggled off for production)
-    
-    // MARK: - Theta Edge Analysis Properties
-    @Published var lastAnalysis: String = ""
+    @Published var lastAnalysis: EmotionalAnalysis?
     @Published var isAnalyzing: Bool = false
-    @Published var analysisHistory: [ThetaEdgeAnalysisService.AnalysisResult] = []
     
     // MARK: - Services
     private let apiService = ThetaAPIService()
     private let continuousSpeechService = ContinuousSpeechService()
     private let emotionalAnalysisService = EmotionalAnalysisService()
-    private let thetaEdgeAnalysisService = ThetaEdgeAnalysisService()
     
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()
     private var didAutoDebugPrompt = false // ensure we only auto-fire a debug test prompt once
     private var emotionalAnalysisTimer: Timer?
+    private let emotionalAnalysisInterval: TimeInterval = 30.0
+    @Published var lastEmotionalAnalysisAt: Date? = nil
     
     // MARK: - App State
     enum AppState: Equatable {
@@ -152,9 +150,7 @@ class ChatViewModel: ObservableObject {
         emotionalAnalysisService.$analysis
             .receive(on: DispatchQueue.main)
             .sink { [weak self] analysis in
-                if let analysis = analysis {
-                    self?.lastAnalysis = "\(analysis.emoji) \(analysis.emotion)"
-                }
+                self?.lastAnalysis = analysis
             }
             .store(in: &cancellables)
         
@@ -164,30 +160,6 @@ class ChatViewModel: ObservableObject {
                 await self?.processAccumulatedText(accumulatedText)
             }
         }
-        
-        // MARK: - Theta Edge Analysis Service Bindings
-        
-        // Bind analysis service properties
-        thetaEdgeAnalysisService.$lastAnalysis
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] analysis in
-                self?.lastAnalysis = analysis
-            }
-            .store(in: &cancellables)
-        
-        thetaEdgeAnalysisService.$isAnalyzing
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] analyzing in
-                self?.isAnalyzing = analyzing
-            }
-            .store(in: &cancellables)
-        
-        thetaEdgeAnalysisService.$analysisHistory
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] (history: [ThetaEdgeAnalysisService.AnalysisResult]) in
-                self?.analysisHistory = history
-            }
-            .store(in: &cancellables)
     }
     
     private func setupWelcomeMessage() {
@@ -247,9 +219,6 @@ class ChatViewModel: ObservableObject {
         
         logger.info("👤 SENDING TO AI: Processing accumulated text (\(trimmedText.count) chars)")
         logger.info("📝 Full text: '\(trimmedText)'")
-        
-        // Send text to Theta Edge Analysis Service for emotional/contextual analysis
-        // thetaEdgeAnalysisService.addTranscribedText(trimmedText)
         
         // Add user message with accumulated text
         await MainActor.run {
@@ -407,24 +376,66 @@ class ChatViewModel: ObservableObject {
     
     /// Manually trigger analysis of current pending text
     func triggerAnalysisNow() {
-        thetaEdgeAnalysisService.analyzeNow()
         logger.info("🧠 Manual analysis triggered")
+        // Build snapshot combining accumulated + live partial (recent) text
+        let textToAnalyze = emotionalAnalysisSnapshot()
+        guard !textToAnalyze.isEmpty else {
+            logger.info("ℹ️ No text available for manual emotional analysis")
+            self.appState = .error("No text to analyze")
+            self.errorMessage = "No text to analyze"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                guard let self = self else { return }
+                if case .error = self.appState {
+                    self.appState = self.isListening ? .continuousListening : .idle
+                    self.errorMessage = nil
+                }
+            }
+            return
+        }
+
+        logger.info("🧵 Emotional snapshot length: \(textToAnalyze.count) chars")
+        // Avoid overlapping analyses
+        guard !isAnalyzing else {
+            logger.info("⏳ Ignoring manual trigger; analysis already running")
+            return
+        }
+        isAnalyzing = true
+        Task { @MainActor in
+            await self.emotionalAnalysisService.analyzeText(textToAnalyze)
+            self.isAnalyzing = false
+            self.lastEmotionalAnalysisAt = Date()
+            // Restart timer so next automatic run is interval from this manual override
+            self.restartEmotionalAnalysisTimer()
+        }
     }
     
     // MARK: - Emotional Analysis Timer
     
     private func startEmotionalAnalysisTimer() {
         stopEmotionalAnalysisTimer() // Ensure no duplicate timers
-        emotionalAnalysisTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+        let fireInterval = emotionalAnalysisInterval
+        emotionalAnalysisTimer = Timer.scheduledTimer(withTimeInterval: fireInterval, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            let textToAnalyze = self.accumulatedText
-            if !textToAnalyze.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Task {
+            let textToAnalyze = self.emotionalAnalysisSnapshot()
+            if !textToAnalyze.isEmpty && !self.isAnalyzing {
+                self.isAnalyzing = true
+                Task { @MainActor in
                     await self.emotionalAnalysisService.analyzeText(textToAnalyze)
+                    self.isAnalyzing = false
+                    self.lastEmotionalAnalysisAt = Date()
                 }
+            } else if self.isAnalyzing {
+                self.logger.info("⏱️ Skipping timer run (analysis already in progress)")
+            } else {
+                self.logger.info("⏱️ Timer emotional analysis skipped (no snapshot text)")
             }
         }
-        logger.info("✅ Started emotional analysis timer (30s interval)")
+        logger.info("✅ Started emotional analysis timer (\(Int(fireInterval))s interval)")
+    }
+
+    private func restartEmotionalAnalysisTimer() {
+        logger.info("🔄 Restarting emotional analysis timer after manual override")
+        startEmotionalAnalysisTimer()
     }
     
     private func stopEmotionalAnalysisTimer() {
@@ -435,29 +446,44 @@ class ChatViewModel: ObservableObject {
     
     /// Clear pending analysis text
     func clearAnalysisText() {
-        thetaEdgeAnalysisService.clearPendingText()
         logger.info("🗑️ Cleared pending analysis text")
     }
     
     /// Get the most recent analysis result
-    var mostRecentAnalysis: ThetaEdgeAnalysisService.AnalysisResult? {
-        return analysisHistory.last
+    var mostRecentAnalysis: EmotionalAnalysis? {
+        return self.lastAnalysis
     }
 
     // MARK: - Debug / Test Utilities
-    func sendTestPrompt() {
-        Task { @MainActor in
-            let prompt = "Give me one concise, uplifting self-improvement insight and a reflective question."
-            logger.info("🧪 DEBUG: Injecting test prompt -> '\(prompt)'")
-            appState = .processing
-            lastSentUserAccumulation = prompt
-            let userMessage = ChatMessage(text: prompt, role: .user)
-            messages.append(userMessage)
-        }
-        Task { await getAIResponse() }
-    }
-    
     func appendText(_ text: String) {
-        continuousSpeechService.appendTextForTesting(text)
+        guard !text.isEmpty else { return }
+        // This should be called on the main thread as it modifies a @Published property
+        DispatchQueue.main.async {
+            let textToAppend = self.accumulatedText.isEmpty ? text : " " + text
+            self.accumulatedText += textToAppend
+            self.logger.info("🧪 DEBUG: Manually appended text: '\(text)'")
+        }
+    }
+
+    func sendTestPrompt() {
+        logger.info("🧪 DEBUG: Manually sending accumulated text via Test AI button.")
+        Task {
+            await processAccumulatedText(self.accumulatedText)
+        }
+    }
+
+    // MARK: - Emotional Analysis Snapshot Builder
+    /// Combines accumulated session text with any current live partial (recent speech) and trims to a max length.
+    private func emotionalAnalysisSnapshot(maxLength: Int = 1000) -> String {
+        // Combine distinct components
+        let parts = [accumulatedText, livePartial]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !parts.isEmpty else { return "" }
+        let combined = parts.joined(separator: " ")
+        if combined.count <= maxLength { return combined }
+        // Keep the most recent portion (suffix) to reflect current emotional state
+        let truncated = String(combined.suffix(maxLength))
+        return truncated
     }
 }

@@ -432,7 +432,15 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
     
     private func handleRecognitionResult(result: SFSpeechRecognitionResult?, error: Error?) {
         if let error = error {
-            logger.error("Speech recognition error: \(error.localizedDescription)")
+            let nsError = error as NSError
+            // Suppress common simulator/network errors to avoid log spam
+            if nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 1101 {
+                // This is a common, noisy error on the simulator. Don't log it as an error.
+                logger.debug("🎤 Ignoring common speech recognition error (code 1101)")
+            } else {
+                logger.error("Speech recognition error: \(error.localizedDescription)")
+            }
+
             // Restart session after error with exponential backoff
             let delay = min(8.0, pow(2.0, Double(consecutiveSilenceCount)))
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
@@ -593,15 +601,6 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
     func setTestAccumulatedText(_ text: String) {
         logger.info("🧪 Setting test accumulated text: \(text)")
         accumulatedText = text
-    }
-    
-    func appendTextForTesting(_ text: String) {
-        Task { @MainActor in
-            self.currentSessionText += text
-            self.accumulatedText += text
-            self.onTextAccumulated?(self.accumulatedText)
-            self.startSilenceTimer()
-        }
     }
     
     private func restartSessionIfNeeded() {
