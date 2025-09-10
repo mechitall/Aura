@@ -9,11 +9,170 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var viewModel = ChatViewModel()
     @State private var isAppearing = false
+    @State private var selectedTab: Int = 0
     
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            CleanAuraView(viewModel: viewModel)
+                .tag(0)
+                .tabItem {
+                    Label("My Aura", systemImage: "waveform.circle")
+                }
+            DebugView(viewModel: viewModel, auraAccentColor: auraAccentColor)
+                .tag(1)
+                .tabItem {
+                    Label("Debug", systemImage: "ladybug")
+                }
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
+                isAppearing = true
+            }
+        }
+        .opacity(isAppearing ? 1.0 : 0.0)
+    }
+    
+    // Aura brand colors
+    private var auraAccentColor: Color {
+        Color(red: 0.4, green: 0.2, blue: 0.8) // Deep purple for Aura theme
+    }
+}
+
+// MARK: - Clean Aura Tab
+struct CleanAuraView: View {
+    @ObservedObject var viewModel: ChatViewModel
+    @State private var pulseScale: CGFloat = 1.0
+    @State private var breathingScale: CGFloat = 1.0
+    
+    private var auraColor: Color { Color(red: 0.4, green: 0.2, blue: 0.8) }
+    
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(.systemBackground),
+                        auraColor.opacity(0.08),
+                        auraColor.opacity(0.04)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                VStack(spacing: 40) {
+                    Spacer()
+                    // Emotional State (if available)
+                    if let analysis = viewModel.lastAnalysis {
+                        VStack(spacing: 4) {
+                            Text(analysis.emoji)
+                                .font(.system(size: 80))
+                                .transition(.scale.combined(with: .opacity))
+                            Text(analysis.emotion)
+                                .font(.title3)
+                                .fontWeight(.medium)
+                                .foregroundColor(.primary)
+                                .transition(.opacity)
+                        }
+                        .padding(.horizontal, 32)
+                    }
+                    
+                    // Main listening control with rings
+                    ZStack {
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    gradient: Gradient(colors: [auraColor.opacity(0.15), auraColor.opacity(0.05), Color.clear]),
+                                    center: .center,
+                                    startRadius: 50,
+                                    endRadius: 150
+                                )
+                            )
+                            .frame(width: 320, height: 320)
+                            .scaleEffect(breathingScale)
+                            .animation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true), value: breathingScale)
+                        if viewModel.isListening {
+                            ForEach(0..<3) { index in
+                                Circle()
+                                    .stroke(auraColor.opacity(0.35 - Double(index) * 0.1), lineWidth: 2)
+                                    .frame(width: 140 + CGFloat(index * 40))
+                                    .scaleEffect(pulseScale)
+                                    .opacity(2.0 - pulseScale)
+                                    .animation(
+                                        .easeOut(duration: 1.6)
+                                        .repeatForever(autoreverses: false)
+                                        .delay(Double(index) * 0.25),
+                                        value: pulseScale
+                                    )
+                            }
+                        }
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { viewModel.toggleContinuousListening() }
+                        } label: {
+                            ZStack {
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                    .frame(width: 120, height: 120)
+                                    .overlay(
+                                        Circle().stroke(
+                                            LinearGradient(
+                                                colors: [Color.white.opacity(0.4), Color.clear, auraColor.opacity(0.25)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 2
+                                        )
+                                    )
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: viewModel.isListening ? [Color.green, Color.green.opacity(0.85)] : [auraColor, auraColor.opacity(0.85)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 90, height: 90)
+                                    .scaleEffect(viewModel.isListening ? 0.9 : 1.0)
+                                Image(systemName: viewModel.isListening ? "waveform" : "ear.and.waveform")
+                                    .font(.system(size: 36, weight: .semibold))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .disabled(viewModel.appState == .processing)
+                        .scaleEffect(viewModel.appState == .processing ? 0.95 : 1.0)
+                        .opacity(viewModel.appState == .processing ? 0.7 : 1.0)
+                    }
+                    .onAppear { setupAnimations() }
+                    .onChange(of: viewModel.isListening) { _ in updatePulse() }
+                    
+                    Text(viewModel.isListening ? "Aura is listening continuously" : "Tap to start continuous listening")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 24)
+                        .multilineTextAlignment(.center)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+    }
+    
+    private func setupAnimations() {
+        breathingScale = 1.05
+        updatePulse()
+    }
+    private func updatePulse() {
+        pulseScale = viewModel.isListening ? 2.0 : 1.0
+    }
+}
+
+// MARK: - Debug Tab Wrapper (original complex UI)
+struct DebugView: View {
+    @ObservedObject var viewModel: ChatViewModel
+    var auraAccentColor: Color
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Beautiful gradient background
                 LinearGradient(
                     stops: [
                         .init(color: Color(.systemBackground), location: 0.0),
@@ -25,18 +184,14 @@ struct ContentView: View {
                     endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
-                
                 VStack(spacing: 0) {
-                    // Custom Navigation Header
-                                    AuraNavigationHeader(
-                                        isListening: viewModel.isListening,
-                                        onClear: { viewModel.clearMessages() },
-                                        onTestAI: { viewModel.sendTestPrompt() },
-                                        onEmotionalAnalysis: { viewModel.triggerAnalysisNow() },
-                                        showDebug: viewModel.debugMode
-                                    )
-                    
-                    // Emotional Analysis Display
+                    AuraNavigationHeader(
+                        isListening: viewModel.isListening,
+                        onClear: { viewModel.clearMessages() },
+                        onTestAI: { viewModel.sendTestPrompt() },
+                        onEmotionalAnalysis: { viewModel.triggerAnalysisNow() },
+                        showDebug: viewModel.debugMode
+                    )
                     if let analysis = viewModel.lastAnalysis {
                         VStack {
                             Text(analysis.emoji)
@@ -51,18 +206,14 @@ struct ContentView: View {
                         .cornerRadius(20)
                         .transition(.opacity.combined(with: .scale))
                     }
-                    
-                    // Chat messages area with glass effect
                     ScrollViewReader { proxy in
                         ScrollView {
                             LazyVStack(spacing: 16) {
-                                // Welcome message area (if no messages)
                                 if viewModel.messages.isEmpty {
                                     AuraWelcomeCard()
                                         .padding(.horizontal, 20)
                                         .padding(.top, 30)
                                 }
-                                
                                 ForEach(viewModel.messages) { message in
                                     ChatBubbleView(message: message)
                                         .id(message.id)
@@ -71,8 +222,6 @@ struct ContentView: View {
                                             removal: .opacity
                                         ))
                                 }
-                                
-                                // Extra bottom padding for recording area
                                 Rectangle()
                                     .fill(Color.clear)
                                     .frame(height: 200)
@@ -89,10 +238,7 @@ struct ContentView: View {
                             }
                         }
                     }
-                    
                     Spacer(minLength: 0)
-                    
-                    // Premium recording interface
                     AuraRecordingInterface(
                         viewModel: viewModel,
                         screenWidth: geometry.size.width
@@ -100,17 +246,6 @@ struct ContentView: View {
                 }
             }
         }
-        .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
-                isAppearing = true
-            }
-        }
-        .opacity(isAppearing ? 1.0 : 0.0)
-    }
-    
-    // Aura brand colors
-    private var auraAccentColor: Color {
-        Color(red: 0.4, green: 0.2, blue: 0.8) // Deep purple for Aura theme
     }
 }
 
