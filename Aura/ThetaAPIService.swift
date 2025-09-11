@@ -347,4 +347,65 @@ class ThetaAPIService {
             }
         }
     }
+
+    // MARK: - One-Off Analysis (Bypasses conversation context & rate limit)
+    /// Performs a single analysis request with explicit system + user prompts, ignoring stored conversation context.
+    /// Useful for large aggregate analyses (e.g. daily pattern mining) so it doesn't pollute regular chat context.
+    func oneOffAnalysis(systemPrompt: String, userPrompt: String, temperature: Double = 0.6, maxTokens: Int = 800) async throws -> String {
+        guard let url = URL(string: baseURL) else { throw APIError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        // We intentionally DO NOT call checkRateLimit() here to allow back-to-back manual analyses.
+        // Still update the timestamp to avoid overlapping generateAIInsight soon after.
+        updateRequestTime()
+
+        let messages: [ThetaMessage] = [
+            ThetaMessage(role: "system", content: systemPrompt),
+            ThetaMessage(role: "user", content: userPrompt)
+        ]
+
+        let input = ThetaRequestInput(
+            messages: messages,
+            stream: false,
+            temperature: temperature,
+            max_tokens: maxTokens,
+            frequency_penalty: 0.1,
+            top_p: 0.9
+        )
+        let body = ThetaRequest(input: input)
+        request.httpBody = try JSONEncoder().encode(body)
+        logger.info("🚀 One-off analysis request (messages=\(messages.count), userChars=\(userPrompt.count))")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+            let raw = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+            logger.info("📥 One-off status=\(http.statusCode) size=\(data.count)")
+            if http.statusCode != 200 {
+                logger.error("💥 One-off non-200 status=\(http.statusCode) body='\(raw.prefix(400))'")
+                throw APIError.invalidResponse
+            }
+            // Parse like normal non-streaming response
+            do {
+                let thetaResponse = try JSONDecoder().decode(ThetaResponse.self, from: data)
+                guard let first = thetaResponse.body.infer_requests.first, let output = first.output else {
+                    throw APIError.noResponse
+                }
+                return output.message
+            } catch {
+                logger.error("💥 One-off decode failed: \(error)")
+                throw APIError.decodingError(error)
+            }
+        } catch let apiErr as APIError {
+            throw apiErr
+        } catch {
+            logger.error("💥 One-off network failure: \(error)")
+            throw APIError.networkError(error)
+        }
+    }
 }

@@ -23,6 +23,11 @@ struct ContentView: View {
                 .tabItem {
                     Label("Debug", systemImage: "ladybug")
                 }
+            DailyAnalysisView(viewModel: viewModel)
+                .tag(2)
+                .tabItem {
+                    Label("Daily", systemImage: "chart.bar.doc.horizontal")
+                }
         }
         .onAppear {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
@@ -1153,5 +1158,110 @@ private struct EmotionalTrendEmojiRow: View {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
+    }
+}
+
+// MARK: - Daily Analysis Tab
+struct DailyAnalysisView: View {
+    @ObservedObject var viewModel: ChatViewModel
+    @State private var appear = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    header
+                    analyzeSection
+                    resultSection
+                }
+                .padding(24)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(LinearGradient(colors: [Color(.systemBackground), Color(.systemBackground).opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea())
+            .navigationTitle("Daily Analysis")
+        }
+        .onAppear { withAnimation(.easeOut(duration: 0.6)) { appear = true } }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Daily Pattern Insights")
+                .font(.title2).bold()
+            Text("Run an end-of-session analysis of everything you've said so far. Aura will surface repeating themes, emotional spikes, and behavior loops.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .opacity(appear ? 1 : 0)
+        .offset(y: appear ? 0 : 10)
+    }
+
+    private var analyzeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button(action: { viewModel.analyzeDailyPatterns() }) {
+                HStack(spacing: 12) {
+                    if viewModel.isPatternAnalyzing {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                    } else {
+                        Image(systemName: "magnifyingglass.circle.fill")
+                            .font(.title2)
+                    }
+                    Text(viewModel.isPatternAnalyzing ? "Analyzing…" : "Analyse my patterns")
+                        .fontWeight(.semibold)
+                }
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+                .background(Capsule().fill(LinearGradient(colors: [Color.purple.opacity(0.8), Color.blue.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)))
+                .foregroundColor(.white)
+            }
+            .disabled(viewModel.isPatternAnalyzing || (viewModel.accumulatedText.isEmpty && viewModel.livePartial.isEmpty))
+            if viewModel.patternAnalysisError != nil {
+                Text(viewModel.patternAnalysisError ?? "")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            } else if !viewModel.isPatternAnalyzing && viewModel.dailyPatterns.isEmpty {
+                Text("No patterns analyzed yet. Tap the button above once you've spoken for a while.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var resultSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if !viewModel.dailyPatterns.isEmpty {
+                Text("Identified Patterns")
+                    .font(.headline)
+                ForEach(viewModel.dailyPatterns) { pattern in
+                    patternCard(pattern)
+                }
+            }
+        }
+        .animation(.easeInOut, value: viewModel.dailyPatterns)
+    }
+
+    private func patternCard(_ pattern: ChatViewModel.DailyPattern) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                Text(pattern.emoji).font(.largeTitle)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(pattern.title)
+                        .font(.headline)
+                    Text(pattern.summary)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    if !pattern.evidenceSnippet.isEmpty {
+                        Text("“\(pattern.evidenceSnippet)”")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 14).fill(.ultraThinMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.primary.opacity(0.08), lineWidth: 1))
     }
 }

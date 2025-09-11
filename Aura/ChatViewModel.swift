@@ -31,6 +31,18 @@ class ChatViewModel: ObservableObject {
     @Published var lastAnalysis: EmotionalAnalysis?
     @Published var isAnalyzing: Bool = false
     @Published var emotionalTrend: [EmotionalPoint] = [] // history for emotional trend visualization
+    // Daily pattern analysis
+    @Published var dailyPatterns: [DailyPattern] = []
+    @Published var isPatternAnalyzing: Bool = false
+    @Published var patternAnalysisError: String? = nil
+
+    struct DailyPattern: Identifiable, Hashable {
+        let id = UUID()
+        let title: String      // Short label e.g. "Repeated Stress Theme"
+        let summary: String    // One-line summary
+        let emoji: String
+        let evidenceSnippet: String // Short snippet from transcript
+    }
     
     // MARK: - Services
     private let apiService = ThetaAPIService()
@@ -102,6 +114,107 @@ class ChatViewModel: ObservableObject {
                 self.sendTestPrompt()
             }
         }
+    }
+
+    // MARK: - Full Transcript Accessor
+    /// Returns the full speech recognition context since app launch (accumulated + live partial)
+    private func fullTranscript() -> String {
+        let parts = [accumulatedText, livePartial]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return parts.joined(separator: " ")
+    }
+
+    // MARK: - Daily Pattern Analysis
+    /// Analyze the entire transcript for behavioral / emotional patterns.
+    func analyzeDailyPatterns() {
+        let transcript = fullTranscript()
+        guard !transcript.isEmpty else {
+            self.patternAnalysisError = "No transcript available yet"
+            return
+        }
+        guard !isPatternAnalyzing else { return }
+        isPatternAnalyzing = true
+        patternAnalysisError = nil
+        logger.info("🧩 Starting daily pattern analysis (len=\(transcript.count) chars)")
+        Task { @MainActor in
+            do {
+                let patterns = try await self.generatePatternAnalysis(transcript: transcript)
+                self.dailyPatterns = patterns
+                logger.info("✅ Daily pattern analysis complete: found \(patterns.count) patterns")
+            } catch {
+                self.patternAnalysisError = error.localizedDescription
+                logger.error("❌ Daily pattern analysis failed: \(error.localizedDescription)")
+            }
+            self.isPatternAnalyzing = false
+        }
+    }
+
+    /// Uses Theta EdgeCloud via existing API service to extract structured patterns.
+    private func generatePatternAnalysis(transcript: String) async throws -> [DailyPattern] {
+    // Cap transcript length to avoid server/context limits (retain last N chars for recency bias)
+    let maxChars = 12_000
+    let trimmed = transcript.count > maxChars ? String(transcript.suffix(maxChars)) : transcript
+
+    let systemPrompt = """
+    You are an elite AI life coach specialized in longitudinal pattern mining across a user's spoken diary for a single day.
+    Return ONLY structured JSON when asked (no pre/post text) if the user explicitly requests JSON output.
+    """.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    let userPrompt = """
+    Full-day transcript (chronological):\n\n""" + trimmed + """\n\nTask: Identify up to 6 meaningful behavioral or emotional patterns. Focus on: repetitions, loops, triggers, coping strategies, emotional spikes, avoidance, growth signals.\nReturn ONLY compact JSON: {\n  \"patterns\": [ {\n    \"title\": short pattern name,\n    \"summary\": one-line explanation under 120 chars,\n    \"emoji\": a single relevant emoji,\n    \"evidence\": one short supporting snippet (<=140 chars)\n  } ]\n}\nDo not include any prose outside of the JSON object.
+    """
+
+    let raw = try await apiService.oneOffAnalysis(systemPrompt: systemPrompt, userPrompt: userPrompt, temperature: 0.55, maxTokens: 700)
+    let patterns = parsePatternJSON(from: raw)
+    return patterns
+    }
+
+    private func parsePatternJSON(from text: String) -> [DailyPattern] {
+        // Find JSON block
+        guard let start = text.firstIndex(of: "{"), let end = text.lastIndex(of: "}") else { return heuristicExtractPatterns(text) }
+        let jsonSlice = text[start...end]
+        let jsonString = String(jsonSlice)
+        struct Root: Decodable {
+            struct P: Decodable {
+                let title: String
+                let summary: String
+                let emoji: String?
+                let evidence: String?
+            }
+            let patterns: [P]
+        }
+        if let data = jsonString.data(using: .utf8) {
+            if let root = try? JSONDecoder().decode(Root.self, from: data) {
+                return root.patterns.map { p in
+                    DailyPattern(title: p.title.trimmingCharacters(in: .whitespacesAndNewlines),
+                                 summary: p.summary.trimmingCharacters(in: .whitespacesAndNewlines),
+                                 emoji: (p.emoji ?? "🧠"),
+                                 evidenceSnippet: (p.evidence ?? "") )
+                }
+            }
+        }
+        return heuristicExtractPatterns(text)
+    }
+
+    private func heuristicExtractPatterns(_ text: String) -> [DailyPattern] {
+        // Fallback: split into lines and grab bullet/numbered lines
+        var patterns: [DailyPattern] = []
+        let lines = text.components(separatedBy: .newlines)
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.count > 8 else { continue }
+            if trimmed.hasPrefix("-") || trimmed.hasPrefix("*") || trimmed.range(of: #"^\d+\."#, options: .regularExpression) != nil {
+                let cmp = trimmed.trimmingCharacters(in: CharacterSet(charactersIn: "-* "))
+                let title = String(cmp.prefix(40))
+                patterns.append(DailyPattern(title: title, summary: cmp, emoji: "🧠", evidenceSnippet: ""))
+            }
+            if patterns.count >= 6 { break }
+        }
+        if patterns.isEmpty {
+            patterns.append(DailyPattern(title: "No clear patterns", summary: "Could not parse structured patterns from analysis output.", emoji: "ℹ️", evidenceSnippet: ""))
+        }
+        return patterns
     }
     
     private func setupBindings() {
