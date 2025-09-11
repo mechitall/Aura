@@ -161,9 +161,22 @@ class ChatViewModel: ObservableObject {
     Return ONLY structured JSON when asked (no pre/post text) if the user explicitly requests JSON output.
     """.trimmingCharacters(in: .whitespacesAndNewlines)
 
-    let userPrompt = """
-    Full-day transcript (chronological):\n\n""" + trimmed + """\n\nTask: Identify up to 6 meaningful behavioral or emotional patterns. Focus on: repetitions, loops, triggers, coping strategies, emotional spikes, avoidance, growth signals.\nReturn ONLY compact JSON: {\n  \"patterns\": [ {\n    \"title\": short pattern name,\n    \"summary\": one-line explanation under 120 chars,\n    \"emoji\": a single relevant emoji,\n    \"evidence\": one short supporting snippet (<=140 chars)\n  } ]\n}\nDo not include any prose outside of the JSON object.
-    """
+        let userPrompt = """
+Full-day transcript (chronological):
+
+\(trimmed)
+
+Task: Identify up to 6 meaningful behavioral or emotional patterns. Focus on: repetitions, loops, triggers, coping strategies, emotional spikes, avoidance, growth signals.
+Return ONLY compact JSON: {
+    "patterns": [ {
+        "title": short pattern name,
+        "summary": one-line explanation under 120 chars,
+        "emoji": a single relevant emoji,
+        "evidence": one short supporting snippet (<=140 chars)
+    } ]
+}
+Do not include any prose outside of the JSON object.
+"""
 
     let raw = try await apiService.oneOffAnalysis(systemPrompt: systemPrompt, userPrompt: userPrompt, temperature: 0.55, maxTokens: 700)
     let patterns = parsePatternJSON(from: raw)
@@ -675,5 +688,58 @@ class ChatViewModel: ObservableObject {
             "depressed": -0.9
         ]
         return mapping[key] ?? 0.0
+    }
+    
+    // MARK: - Therapy Chat State
+    @Published var therapyMessages: [ChatMessage] = []
+    @Published var isTherapyLoading: Bool = false
+    
+    // Build emotional trend summary for therapy context
+    private func buildEmotionalTrendSummary(last: Int = 12) -> String {
+        if emotionalTrend.isEmpty { return "(no emotional snapshots yet)" }
+        let slice = emotionalTrend.suffix(last)
+        let parts = slice.map { point in
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            return "\(formatter.string(from: point.date)): \(point.emotion) \(point.emoji)"
+        }
+        return parts.joined(separator: ", ")
+    }
+    
+    // Build pattern summaries for therapy context
+    private func buildPatternSummaries() -> String {
+        if dailyPatterns.isEmpty { return "(no patterns identified yet)" }
+        return dailyPatterns.map { p in "- \(p.title): \(p.summary)" }.joined(separator: "\n")
+    }
+    
+    func sendTherapyMessage(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard !isTherapyLoading else { return }
+        let userMsg = ChatMessage(text: trimmed, role: .user)
+        therapyMessages.append(userMsg)
+        isTherapyLoading = true
+        Task { [weak self] in
+            guard let self = self else { return }
+            let emotionalSummary = self.buildEmotionalTrendSummary()
+            let patternSummary = self.buildPatternSummaries()
+            do {
+                let reply = try await self.apiService.generateTherapyResponse(
+                    userMessage: trimmed,
+                    emotionalTrendSummary: emotionalSummary,
+                    patternSummaries: patternSummary,
+                    priorTherapyTurns: self.therapyMessages
+                )
+                await MainActor.run {
+                    self.therapyMessages.append(ChatMessage(text: reply, role: .ai))
+                    self.isTherapyLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.therapyMessages.append(ChatMessage(text: "I'm having trouble formulating a response right now. Could you rephrase or try again in a moment?", role: .ai))
+                    self.isTherapyLoading = false
+                }
+            }
+        }
     }
 }

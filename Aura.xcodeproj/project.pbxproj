@@ -12,6 +12,7 @@
 		3C4D5E6F7890ABCD23456789 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5E6F7890ABCD1234567890 /* ContentView.swift */; };
 		5E6F7890ABCD345678901234 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F7890ABCD12345678904567 /* ChatMessage.swift */; };
 		7890ABCD456789012345ABCD /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 890ABCD1567890123456BCDE /* ChatBubbleView.swift */; };
+		7890ABCD456789012345ACCF /* ChatTherapyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 890ABCD1567890123456BCDF /* ChatTherapyView.swift */; };
 		90ABCD16789012345678CDEF /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0BCDE278901234567890DEF /* ChatViewModel.swift */; };
 		B0CDE3890123456789012EF0 /* ThetaAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF490123456789012F012 /* ThetaAPIService.swift */; };
 		B1CDE3890123456789012EF1 /* ThetaEdgeAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DEF490123456789012F013 /* ThetaEdgeAnalysisService.swift */; };
@@ -32,6 +33,7 @@
 		4D5E6F7890ABCD1234567890 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		6F7890ABCD12345678904567 /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
 		890ABCD1567890123456BCDE /* ChatBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
+		890ABCD1567890123456BCDF /* ChatTherapyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTherapyView.swift; sourceTree = "<group>"; };
 		A0BCDE278901234567890DEF /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
 		C0DEF490123456789012F012 /* ThetaAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThetaAPIService.swift; sourceTree = "<group>"; };
 		C1DEF490123456789012F013 /* ThetaEdgeAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThetaEdgeAnalysisService.swift; sourceTree = "<group>"; };
@@ -63,6 +65,7 @@
 				2B3C4D5E6F7890AB12345678 /* AuraApp.swift */,
 				4D5E6F7890ABCD1234567890 /* ContentView.swift */,
 				890ABCD1567890123456BCDE /* ChatBubbleView.swift */,
+				890ABCD1567890123456BCDF /* ChatTherapyView.swift */,
 				6F7890ABCD12345678904567 /* ChatMessage.swift */,
 				A0BCDE278901234567890DEF /* ChatViewModel.swift */,
 				C0DEF490123456789012F012 /* ThetaAPIService.swift */,
@@ -165,6 +168,7 @@
 				3C4D5E6F7890ABCD23456789 /* ContentView.swift in Sources */,
 				5E6F7890ABCD345678901234 /* ChatMessage.swift in Sources */,
 				7890ABCD456789012345ABCD /* ChatBubbleView.swift in Sources */,
+				7890ABCD456789012345ACCF /* ChatTherapyView.swift in Sources */,
 				90ABCD16789012345678CDEF /* ChatViewModel.swift in Sources */,
 				B0CDE3890123456789012EF0 /* ThetaAPIService.swift in Sources */,
 				B1CDE3890123456789012EF1 /* ThetaEdgeAnalysisService.swift in Sources */,

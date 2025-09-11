@@ -1,200 +1,162 @@
-# Aura - AI Life Coach iOS App
+# Aura – AI Life Coach (Continuous Speech + Emotional Intelligence)
 
-**Aura** is a production-ready, native iOS application built with SwiftUI that provides AI-powered life coaching through voice interaction. The app uses your device's microphone to listen to your thoughts and provides empathetic, CBT-based responses through the Theta EdgeCloud API.
+> Real-time, privacy-conscious AI life coach that listens continuously, tracks emotional trends, and surfaces deep behavioral patterns.
 
-## 🎯 Features
+<p align="center">
+   <img src="screenshot.png" alt="Aura main emotional state and graph screenshot" width="420" />
+</p>
 
-- **Voice-to-Text**: Real-time speech transcription using Whisper API
-- **AI Life Coach**: Thoughtful responses from Llama-3-8B-Instruct model
-- **SwiftUI Interface**: Modern, native iOS user experience
-- **MVVM Architecture**: Clean, maintainable code structure
-- **Audio Processing**: Professional-grade audio capture and processing
-- **Privacy-Focused**: Audio is processed securely and not stored permanently
+## 🚀 Overview
+Aura is a SwiftUI iOS application that acts as an always-on reflective companion. It continuously transcribes speech locally, periodically summarizes and analyzes what you say, extracts emotions every 30 seconds, and (on demand) performs a **Daily Pattern Analysis** to uncover repeating themes, emotional spikes, coping loops, and growth signals.
 
-## 🏗️ Architecture
+The experience is split into focused tabs:
+- **My Aura** – Clean end‑user view: current emotional state + trend graph + primary listening control.
+- **Daily** – One‑off full‑day behavioral / emotional pattern mining with structured JSON parsing.
+- **Debug** – Rich diagnostics: raw transcript flow, timers, manual triggers, internal states.
 
-The app follows a strict MVVM (Model-View-ViewModel) pattern:
+## ✨ Core Features
+| Category | Capability |
+|----------|-----------|
+| Continuous Listening | Auto starts after permission; segments speech by silence & timing |
+| Adaptive Accumulation | Bundles ~1 minute of meaningful speech before AI insight request |
+| AI Coaching Responses | Structured conversation context → Theta EdgeCloud (Llama / similar) |
+| Emotional Snapshots | Automatic + manual emotional analysis every 30s (Neutral fallback) |
+| Emotional Trend Graph | Strava‑like area graph + emoji row & positivity baseline |
+| Daily Pattern Analysis | One‑off transcript mining → patterns (title, summary, emoji, evidence) |
+| Resilient Parsing | Multi‑strategy emotion + JSON extraction w/ heuristic fallback |
+| Rate Limiting & Context Mgmt | Cooldown & trimmed rolling buffer (max messages) |
+| Privacy‑Aware | In-memory transcript only (no persistence yet) |
+| Debug Utilities | Test prompt, timers, diagnostics logging |
 
-- **Models**: `ChatMessage.swift` - Data structures
-- **Views**: `ContentView.swift`, `ChatBubbleView.swift` - SwiftUI interfaces
-- **ViewModels**: `ChatViewModel.swift` - State management and business logic
-- **Services**: `ThetaAPIService.swift`, `AudioService.swift` - External integrations
+Legacy feature notes retained: earlier Whisper transcription approach evolved into a custom continuous speech pipeline; CBT‑style coaching retained in prompt persona.
 
-## 🚀 Quick Start
+## 🧠 Product Philosophy
+Reduce friction in self‑reflection:
+- Passive capture → active insight
+- Lightweight emotional bio‑feedback
+- Pattern surfacing for habit change
+- Coaching tone: supportive, contextual, concise
 
-### Prerequisites
-
-- Xcode 15.0 or later
-- iOS 16.0+ target device or simulator
-- Theta EdgeCloud API key
-- Valid Apple Developer account (for device testing)
-
-### Setup Instructions
-
-1. **Open in Xcode**:
-   ```bash
-   cd /Users/neo/AIcoach/Aura
-   open Aura.xcodeproj
-   ```
-
-2. **Configure API Key**:
-   - Open `ThetaAPIService.swift`
-   - Replace `"YOUR_THETA_API_KEY_HERE"` with your actual Theta EdgeCloud API key:
-   ```swift
-   private let apiKey = "your_actual_theta_api_key_here"
-   ```
-
-3. **Update Bundle Identifier**:
-   - Select the project in Xcode Navigator
-   - Under "Signing & Capabilities", change the bundle identifier
-   - Ensure your development team is selected
-
-4. **Build and Run**:
-   - Select your target device or simulator
-   - Press `Cmd + R` to build and run
-
-### First Launch
-
-1. The app will request microphone permission - **Grant this for the app to function**
-2. Tap the microphone button to start your first conversation with Aura
-3. Speak naturally - the app will detect silence and auto-stop recording
-4. Wait for Aura's thoughtful response
-
-## 💬 How to Use
-
-1. **Start Conversation**: Tap the blue microphone button
-2. **Speak Freely**: Share your thoughts, feelings, or concerns
-3. **Auto-Stop**: The app detects 4 seconds of silence and stops recording
-4. **Manual Stop**: Tap the red stop button to end recording early
-5. **AI Response**: Aura provides empathetic, CBT-based guidance
-6. **Continue**: The conversation flows naturally - just tap to speak again
-
-## 🔧 Technical Details
-
-### Audio Processing
-- **Format**: 16kHz, 16-bit, Mono PCM
-- **Framework**: AVFoundation AVAudioEngine
-- **Conversion**: Automatic PCM to WAV conversion for Whisper API
-- **Real-time**: Live audio level monitoring and silence detection
-
-### API Integration
-- **Whisper**: Speech-to-text transcription
-- **Llama-3**: AI responses with CBT-focused system prompt
-- **Async/Await**: Modern Swift concurrency for all network calls
-- **Error Handling**: Comprehensive error management and user feedback
-
-### SwiftUI Features
-- **Animations**: Smooth pulsing microphone button during recording
-- **Auto-scroll**: Chat automatically scrolls to latest messages
-- **Dark Mode**: Full support for iOS dark/light mode
-- **Accessibility**: Voice Over and accessibility features supported
-
-## 🛡️ Privacy & Security
-
-- **Microphone**: Only accessed when explicitly recording
-- **Audio Data**: Converted and sent to API, not stored locally
-- **API Communication**: HTTPS encryption for all network requests
-- **Permissions**: Explicit user consent required for microphone access
-
-## 🔧 Customization
-
-### Modify AI Behavior
-Edit the system prompt in `ThetaAPIService.swift`:
-```swift
-private let systemPrompt = """
-Your custom AI personality and instructions here...
-"""
-```
-
-### Adjust Audio Settings
-Modify recording parameters in `AudioService.swift`:
-```swift
-private let sampleRate: Double = 16000 // Change sample rate
-private let silenceTimeout: TimeInterval = 4.0 // Change silence detection
-```
-
-### Customize UI
-- Edit colors and styling in `ContentView.swift` and `ChatBubbleView.swift`
-- Modify animations and transitions
-- Add new UI components
-
-## 📱 Testing
-
-### iOS Simulator
-- Limited microphone testing capability
-- Use for UI and basic flow testing
-- No real audio processing possible
-
-### Physical Device
-- **Recommended** for full functionality testing
-- Real microphone input and audio processing
-- Complete user experience validation
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**"Microphone permission denied"**:
-- Go to Settings > Privacy & Security > Microphone > Aura > Enable
-
-**"API Error"**:
-- Verify your Theta EdgeCloud API key is correct
-- Check internet connection
-- Ensure API endpoints are accessible
-
-**"Audio not recording"**:
-- Test microphone with other apps
-- Restart the app
-- Check device audio settings
-
-### Debug Mode
-Enable detailed logging by adding debug prints in:
-- `AudioService.swift` - Audio processing events
-- `ThetaAPIService.swift` - API request/response logging
-- `ChatViewModel.swift` - State changes and flow
-
-## 🚀 Deployment
-
-### App Store Preparation
-1. Configure proper app icons and launch screens
-2. Add App Store metadata and screenshots
-3. Ensure all privacy descriptions are accurate
-4. Test thoroughly on multiple devices and iOS versions
-5. Follow Apple's App Store Review Guidelines
-
-### API Key Security
-**Important**: For production deployment:
-- Never commit API keys to version control
-- Use Xcode build configurations or secure key management
-- Consider server-side API proxy for additional security
-
-## 📝 File Structure
+## 🏗 Architecture
+**Pattern:** MVVM + service layer.
 
 ```
-Aura/
-├── Aura.xcodeproj/           # Xcode project file
-├── Aura/
-│   ├── AuraApp.swift          # Main app entry point
-│   ├── ContentView.swift      # Main interface
-│   ├── ChatBubbleView.swift   # Individual message display
-│   ├── ChatMessage.swift      # Message data model
-│   ├── ChatViewModel.swift    # State management
-│   ├── ThetaAPIService.swift  # API integration
-│   ├── AudioService.swift     # Audio processing
-│   ├── Info.plist            # App configuration
-│   └── Preview Content/       # SwiftUI previews
-└── README.md                 # This file
+AuraApp
+   └── ContentView (TabView)
+            ├── CleanAuraView      (consumer UI)
+            ├── DailyAnalysisView  (full-day pattern mining)
+            └── DebugView          (diagnostics + controls)
+
+ChatViewModel (@MainActor)
+   ├── ContinuousSpeechService  (streaming SFSpeechRecognizer orchestration)
+   ├── ThetaAPIService          (conversation + one-off inference requests)
+   ├── EmotionalAnalysisService (30s emotion snapshots)
+   ├── ThetaEdgeAnalysisService (experimental periodic thematic analyzer)
+   └── State: messages, accumulatedText, livePartial, emotionalTrend, dailyPatterns
 ```
+
+### Key State Flows
+1. **Speech → Accumulation:** `ContinuousSpeechService` builds `accumulatedText` while tracking silence, noise floor, confidence & session boundaries.
+2. **Accumulation → AI Insight:** After interval / condition, `ChatViewModel` posts accumulated block via `ThetaAPIService.generateAIInsight()`; AI reply appended to chat.
+3. **Emotional Polling:** 30s timer (plus manual trigger) calls `EmotionalAnalysisService.analyzeText()` on merged snapshot (accumulated + live partial). Result normalized → appended to `emotionalTrend`.
+4. **Daily Pattern Mining:** User taps “Analyse my patterns” → `oneOffAnalysis()` with JSON-only prompt over truncated transcript (last 12k chars). Parsed → `[DailyPattern]`.
+
+### Resilience & Safeguards
+- Default Neutral emotion so UI never blank.
+- Conversational requests rate-limited; daily analysis bypasses but updates timestamp.
+- JSON parsing fallback if LLM returns prose.
+- Context trimming & transcript truncation to prevent oversized payloads.
+
+## 🔍 Notable Implementation Details
+- **Swift Concurrency:** Async/await for network + emotion tasks; main actor state mutations.
+- **Combine:** Service publishers (audio level, partial transcript) bridged into SwiftUI.
+- **Graph Rendering:** Custom path + gradient + emoji row outside clipped chart.
+- **Parsing Strategies:** Colon split, emoji scan, whitelist keywords for emotions; JSON substring or bullet heuristic for patterns.
+- **Prompts:** Persona system prompt for coaching; dedicated minimal JSON extraction prompt for pattern analysis.
+
+## � Key Source Files
+| File | Purpose |
+|------|---------|
+| `AuraApp.swift` | App entry & env loading |
+| `ContentView.swift` | Tab orchestration & major subviews |
+| `ChatViewModel.swift` | Core orchestration & published state |
+| `ContinuousSpeechService.swift` | Continuous speech recognition pipeline |
+| `ThetaAPIService.swift` | Conversation + one-off analysis requests |
+| `EmotionalAnalysisService.swift` | Emotional snapshot analyzer |
+| `ThetaEdgeAnalysisService.swift` | Experimental thematic analyzer |
+| `AudioService.swift` | Legacy / alternative speech approach |
+| `ChatMessage.swift` | Chat message model |
+| `Config.swift` | Environment variable loader |
+
+## ⚙️ Configuration
+Create a `.env` file (loaded at launch) with:
+```
+THETA_API_KEY=your_theta_edge_api_key_here
+```
+Ensure the key has access to the endpoints configured in `ThetaAPIService.baseURL`.
+
+## ▶️ Running the App
+1. Open `Aura.xcodeproj` in Xcode 15+.
+2. Add your `.env` file (not committed).  
+3. Build & run on a physical device for best speech input.  
+4. Grant microphone & speech recognition permissions.  
+5. Speak naturally; observe emotional graph; run Daily analysis when ready.
+
+## 💬 Usage Flow
+1. Launch → permissions auto-check → continuous listening starts.
+2. Speak freely; transcript accrues.
+3. Aura periodically responds & updates emotion every 30s.
+4. Open **Daily** tab for end-of-session pattern mining.
+
+## 📊 Emotional Trend Scoring
+Internal mapping (`score(for:)`) converts emotions → [-1, +1] for vertical placement.
+
+## 🧩 Daily Pattern Output (Example)
+```json
+{
+   "patterns": [
+      { "title": "Evening Rumination", "summary": "You revisit unresolved work thoughts after 9pm, raising anxiety.", "emoji": "🌀", "evidence": "kept thinking about the project after dinner" }
+   ]
+}
+```
+Heuristic fallback: bullet-like lines if JSON parse fails.
+
+## 🔐 Privacy
+- Transcript in-memory only (session scope).
+- No audio persistence. Only text context sent upstream.
+- Future: optional local summarization + persistence encryption.
+
+## � Roadmap
+| Area | Idea |
+|------|------|
+| Persistence | Secure storage of emotional trend & patterns |
+| Personalization | Adaptive emotion taxonomy, user mood tagging |
+| UI | Tap-to-inspect graph points / pattern drill-down |
+| Coaching Loop | Action items & reminders |
+| Privacy | Edge summarization before cloud send |
+| Analytics | Sentiment volatility, streak metrics |
+| Offline | Local fallback model (basic emotion) |
+| Internationalization | Multi-language speech support |
+
+## 🧪 Testing Suggestions
+- Mock `ThetaAPIService` to inject deterministic responses.
+- Unit test emotion parsing permutations (colon / emoji / whitelist).
+- Snapshot test `EmotionalTrendGraph` with synthetic data.
+
+## ⚠️ Known Limitations
+- No persistence (loss on restart).
+- Transcript truncated for daily analysis (12k char suffix).
+- Pattern extraction depends on LLM JSON compliance.
+- Overlap between `AudioService` & `ContinuousSpeechService` (one could be retired).
 
 ## 🤝 Contributing
+1. Fork & branch (`feature/my-improvement`).
+2. Implement focused change (small PRs preferred).
+3. Add minimal test or reproduction notes.
+4. Submit PR with before/after behavior summary.
 
-This is a complete, production-ready codebase. Key areas for enhancement:
-- Additional AI models and providers
-- Enhanced audio processing (noise reduction, etc.)
-- Conversation history persistence
-- User customization options
-- Advanced CBT features and exercises
+## 📄 License
+Proprietary (add chosen license or convert to OSS later).
 
 ---
-
-**Aura** demonstrates professional iOS development practices with real-world API integration, proper architecture, and production-ready code quality. The app provides a foundation for AI-powered therapeutic applications while maintaining user privacy and delivering excellent user experience.
+**Aura** turns passive speech into actionable emotional + behavioral insight. Speak. Observe. Adapt.

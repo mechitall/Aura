@@ -18,13 +18,18 @@ struct ContentView: View {
                 .tabItem {
                     Label("My Aura", systemImage: "waveform.circle")
                 }
-            DebugView(viewModel: viewModel, auraAccentColor: auraAccentColor)
+            ChatTherapyView(viewModel: viewModel)
                 .tag(1)
+                .tabItem {
+                    Label("Chat", systemImage: "text.bubble")
+                }
+            DebugView(viewModel: viewModel, auraAccentColor: auraAccentColor)
+                .tag(2)
                 .tabItem {
                     Label("Debug", systemImage: "ladybug")
                 }
             DailyAnalysisView(viewModel: viewModel)
-                .tag(2)
+                .tag(3)
                 .tabItem {
                     Label("Daily", systemImage: "chart.bar.doc.horizontal")
                 }
