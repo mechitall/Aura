@@ -73,7 +73,7 @@ struct CleanAuraView: View {
                             .fontWeight(.medium)
                             .foregroundColor(.primary)
                             .transition(.opacity)
-                        EmotionalTrendBar(points: viewModel.emotionalTrend)
+                        EmotionalTrendGraph(points: viewModel.emotionalTrend)
                             .frame(height: 60)
                             .padding(.top, 8)
                     }
@@ -202,7 +202,7 @@ struct DebugView: View {
                             .font(.title2)
                             .fontWeight(.semibold)
                             .foregroundColor(.white)
-                        EmotionalTrendBar(points: viewModel.emotionalTrend)
+                        EmotionalTrendGraph(points: viewModel.emotionalTrend)
                             .frame(height: 50)
                             .padding(.top, 6)
                     }
@@ -983,6 +983,169 @@ struct EmotionalTrendBar: View {
                 )
         )
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+// MARK: - Emotional Trend Graph (Strava-like)
+struct EmotionalTrendGraph: View {
+    let points: [ChatViewModel.EmotionalPoint]
+    private let horizontalInset: CGFloat = 14
+    private let topMargin: CGFloat = 4 // reduced since emojis now outside chart
+    private let emojiRowHeight: CGFloat = 24
+    private let emojiSpacing: CGFloat = 4
+    
+    private func path(for size: CGSize) -> Path {
+        var path = Path()
+        guard !points.isEmpty else { return path }
+        let midY = size.height / 2
+        let amplitude = midY - topMargin
+        let stepX = (size.width - 2 * horizontalInset) / CGFloat(max(points.count - 1, 1))
+        path.move(to: CGPoint(x: horizontalInset, y: midY))
+        for (idx, p) in points.enumerated() {
+            let x = horizontalInset + CGFloat(idx) * stepX
+            let y = midY - CGFloat(p.score) * amplitude
+            path.addLine(to: CGPoint(x: x, y: y))
+        }
+        path.addLine(to: CGPoint(x: horizontalInset + CGFloat(max(points.count - 1, 0)) * stepX, y: midY))
+        return path
+    }
+    
+    private func fillPath(for size: CGSize) -> Path {
+        var path = Path()
+        guard !points.isEmpty else { return path }
+        let midY = size.height / 2
+        let amplitude = midY - topMargin
+        let stepX = (size.width - 2 * horizontalInset) / CGFloat(max(points.count - 1, 1))
+        path.move(to: CGPoint(x: horizontalInset, y: midY))
+        for (idx, p) in points.enumerated() {
+            let x = horizontalInset + CGFloat(idx) * stepX
+            let y = midY - CGFloat(p.score) * amplitude
+            path.addLine(to: CGPoint(x: x, y: y))
+        }
+        path.addLine(to: CGPoint(x: horizontalInset + CGFloat(max(points.count - 1, 0)) * stepX, y: midY))
+        path.closeSubpath()
+        return path
+    }
+    
+    private func color(for score: Double) -> Color {
+        switch score {
+        case let x where x >= 0.7: return .green
+        case 0.3..<0.7: return .mint
+        case 0.05..<0.3: return .teal
+        case -0.2..<0.05: return .gray
+        case -0.5 ..< -0.2: return .orange
+        case -0.8 ..< -0.5: return .red
+        default: return .purple
+        }
+    }
+    
+    var body: some View {
+        GeometryReader { geo in
+            let totalSize = geo.size
+            // Allocate remaining height to chart after emoji row + spacing
+            let chartHeight = max(10, totalSize.height - emojiRowHeight - emojiSpacing)
+            let chartSize = CGSize(width: totalSize.width, height: chartHeight)
+            VStack(spacing: emojiSpacing) {
+                EmotionalTrendEmojiRow(points: points, horizontalInset: horizontalInset)
+                    .frame(height: emojiRowHeight)
+                    .animation(Animation.easeInOut(duration: 0.5), value: points.count)
+                EmotionalTrendGraphBody(
+                    size: chartSize,
+                    points: points,
+                    path: path(for: chartSize),
+                    areaPath: fillPath(for: chartSize),
+                    colorProvider: color,
+                    horizontalInset: horizontalInset,
+                    topMargin: topMargin
+                )
+                .frame(height: chartHeight)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                        )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .animation(Animation.easeInOut(duration: 0.5), value: points.count)
+            }
+            .frame(width: totalSize.width, height: totalSize.height, alignment: .top)
+        }
+    }
+}
+
+// MARK: - Extracted Body To Assist Type Checker
+private struct EmotionalTrendGraphBody: View {
+    let size: CGSize
+    let points: [ChatViewModel.EmotionalPoint]
+    let path: Path
+    let areaPath: Path
+    let colorProvider: (Double) -> Color
+    let horizontalInset: CGFloat
+    let topMargin: CGFloat
+
+    // Precompute gradients outside main body expression
+    private var areaGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.red.opacity(0.25),
+                Color.orange.opacity(0.2),
+                Color.gray.opacity(0.15),
+                Color.green.opacity(0.25)
+            ],
+            startPoint: .bottom,
+            endPoint: .top
+        )
+    }
+
+    private var lineGradient: LinearGradient {
+        LinearGradient(
+            colors: [Color.red, Color.orange, Color.teal, Color.green],
+            startPoint: .bottom,
+            endPoint: .top
+        )
+    }
+
+    var body: some View {
+        ZStack {
+            baseline
+            areaPath.fill(areaGradient)
+            path.stroke(lineGradient, lineWidth: 2)
+                .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var baseline: some View {
+        Path { p in
+            p.move(to: CGPoint(x: horizontalInset, y: size.height / 2))
+            p.addLine(to: CGPoint(x: size.width - horizontalInset, y: size.height / 2))
+        }
+        .stroke(Color.primary.opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [4,4]))
+    }
+
+}
+
+// Emoji row above chart
+private struct EmotionalTrendEmojiRow: View {
+    let points: [ChatViewModel.EmotionalPoint]
+    let horizontalInset: CGFloat
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let stepX = (width - 2 * horizontalInset) / CGFloat(max(points.count - 1, 1))
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(points.enumerated()), id: \.0) { (idx, p) in
+                    Text(p.emoji)
+                        .font(.system(size: 16))
+                        .position(x: horizontalInset + CGFloat(idx) * stepX, y: 12)
+                        .accessibilityLabel("Emotion \(p.emotion)")
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        }
     }
 }
 
