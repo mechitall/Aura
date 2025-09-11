@@ -38,26 +38,11 @@ class ChatViewModel: ObservableObject {
     @Published var patternAnalysisError: String? = nil
     @Published var lastPatternAnalysisAt: Date? = nil
     private var lastPatternTranscriptHash: Int? = nil
-    // Language selection (multi-select). Maintain a primary used for active recognition.
-    @Published var selectedLanguages: Set<SpeechLanguage> = [.english] {
-        didSet {
-            if self.selectedLanguages.isEmpty { // safety: always keep at least one
-                self.selectedLanguages = [.english]
-            }
-            if !self.selectedLanguages.contains(self.primaryLanguage) {
-                // Auto-adjust primary to a stable deterministic choice (alphabetical)
-                self.primaryLanguage = self.selectedLanguages.sorted { $0.rawValue < $1.rawValue }.first ?? .english
-            }
-            self.persistLanguageSelection()
-        }
-    }
+    // Single active speech recognition language
     @Published var primaryLanguage: SpeechLanguage = .english {
         didSet {
             if oldValue != self.primaryLanguage {
-                if !self.selectedLanguages.contains(self.primaryLanguage) {
-                    self.selectedLanguages.insert(self.primaryLanguage)
-                }
-                self.logger.info("🌐 Primary language changed → \(self.primaryLanguage.rawValue)")
+                self.logger.info("🌐 Active language changed → \(self.primaryLanguage.rawValue)")
                 self.continuousSpeechService.setLanguage(self.primaryLanguage)
                 self.persistLanguageSelection()
             }
@@ -278,7 +263,7 @@ Do not include any prose outside of the JSON object.
     }
     
     private func setupBindings() {
-        // Bind active language from service (in case changed elsewhere)
+        // Bind active language from service (mirror changes initiated elsewhere)
         continuousSpeechService.$activeLanguage
             .receive(on: DispatchQueue.main)
             .sink { [weak self] lang in
@@ -387,15 +372,15 @@ Do not include any prose outside of the JSON object.
 
     private func maybeAutoDetectLanguage(on aggregate: String) {
         // Size gate
-        guard aggregate.count >= autoDetectMinChars else {
-            logger.debug("🌐 AutoDetect skip: not enough chars (\(aggregate.count)/\(autoDetectMinChars))")
+        guard aggregate.count >= self.autoDetectMinChars else {
+            logger.debug("🌐 AutoDetect skip: not enough chars (\(aggregate.count)/\(self.autoDetectMinChars))")
             return
         }
         // Cooldown gate
-        if let last = lastAutoDetectAt {
+        if let last = self.lastAutoDetectAt {
             let since = Date().timeIntervalSince(last)
-            if since < autoDetectCooldown {
-                logger.debug("🌐 AutoDetect skip: cooldown (\(Int(since))s < \(Int(autoDetectCooldown))s)")
+            if since < self.autoDetectCooldown {
+                logger.debug("🌐 AutoDetect skip: cooldown (\(Int(since))s < \(Int(self.autoDetectCooldown))s)")
                 return
             }
         }
@@ -403,7 +388,6 @@ Do not include any prose outside of the JSON object.
         // Heuristic script / token checks first (fast path)
         if let (heuristicLang, hConf) = heuristicLanguage(for: aggregate) {
             if heuristicLang != self.primaryLanguage {
-                self.selectedLanguages.insert(heuristicLang)
                 self.logger.info("🌐 Heuristic switch → \(heuristicLang.rawValue) (confidence=\(hConf))")
                 self.primaryLanguage = heuristicLang
                 self.lastAutoDetectAt = Date()
@@ -437,11 +421,10 @@ Do not include any prose outside of the JSON object.
             logger.debug("🌐 AutoDetect skip: candidate == current (\(candidate.rawValue))")
             return
         }
-        guard confidence >= autoDetectConfidenceThreshold else {
-            logger.debug("🌐 AutoDetect skip: confidence \(confidence) < threshold \(autoDetectConfidenceThreshold)")
+        guard confidence >= self.autoDetectConfidenceThreshold else {
+            logger.debug("🌐 AutoDetect skip: confidence \(confidence) < threshold \(self.autoDetectConfidenceThreshold)")
             return
         }
-        self.selectedLanguages.insert(candidate)
         self.logger.info("🌐 Auto-detected language switch to \(candidate.rawValue) (confidence=\(confidence))")
         self.primaryLanguage = candidate
         self.lastAutoDetectAt = Date()
@@ -449,7 +432,7 @@ Do not include any prose outside of the JSON object.
 
     private func heuristicLanguage(for text: String) -> (SpeechLanguage, Double)? {
         // Detect Cyrillic quickly
-        if text.range(of: "[\u0400-\u04FF]", options: .regularExpression) != nil {
+        if text.range(of: "[\\u0400-\\u04FF]", options: .regularExpression) != nil {
             return (.russian, 0.9)
         }
         // German diacritics or common short words pattern; keep false positives low
@@ -464,31 +447,24 @@ Do not include any prose outside of the JSON object.
     }
 
     // MARK: - Language Persistence
-    private let languageDefaultsKey = "Aura.SelectedLanguages" // stored as array of raw values
     private let primaryLanguageDefaultsKey = "Aura.PrimaryLanguage"
     private let legacySingleLanguageKey = "Aura.SelectedLanguage"
     private let autoDetectDefaultsKey = "Aura.AutoDetectLanguages"
     private func persistLanguageSelection() {
-        let raws = selectedLanguages.map { $0.rawValue }
-        UserDefaults.standard.set(raws, forKey: languageDefaultsKey)
         UserDefaults.standard.set(primaryLanguage.rawValue, forKey: primaryLanguageDefaultsKey)
     UserDefaults.standard.set(autoDetectEnabled, forKey: autoDetectDefaultsKey)
     }
     private func migrateAndLoadLanguages() {
         let defaults = UserDefaults.standard
-        var loadedSet: Set<SpeechLanguage> = []
-        if let array = defaults.array(forKey: languageDefaultsKey) as? [String] {
-            for raw in array { if let lang = SpeechLanguage(rawValue: raw) { loadedSet.insert(lang) } }
-        } else if let legacy = defaults.string(forKey: legacySingleLanguageKey), let lang = SpeechLanguage(rawValue: legacy) {
-            // migrate legacy single value
-            loadedSet.insert(lang)
-        }
-        if loadedSet.isEmpty { loadedSet = [.english] }
-        selectedLanguages = loadedSet
         if let primaryRaw = defaults.string(forKey: primaryLanguageDefaultsKey), let primary = SpeechLanguage(rawValue: primaryRaw) {
             primaryLanguage = primary
         } else {
-            primaryLanguage = loadedSet.sorted { $0.rawValue < $1.rawValue }.first ?? .english
+            // Fallback to legacy single-language key or default english
+            if let legacy = defaults.string(forKey: legacySingleLanguageKey), let legacyLang = SpeechLanguage(rawValue: legacy) {
+                primaryLanguage = legacyLang
+            } else {
+                primaryLanguage = .english
+            }
         }
     autoDetectEnabled = defaults.bool(forKey: autoDetectDefaultsKey)
         continuousSpeechService.setLanguage(primaryLanguage)

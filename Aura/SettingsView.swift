@@ -7,37 +7,28 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Speech Recognition Languages")) {
-                    // Multi-select toggles
-                    ForEach(SpeechLanguage.allCases) { lang in
-                        Toggle(isOn: Binding(
-                            get: { viewModel.selectedLanguages.contains(lang) },
-                            set: { isOn in
-                                if isOn { viewModel.selectedLanguages.insert(lang) } else { viewModel.selectedLanguages.remove(lang) }
-                            }
-                        )) {
-                            HStack {
-                                Text(lang.flag)
-                                Text(lang.displayName)
-                            }
-                        }
-                    }
-                    Picker("Primary (active)", selection: $viewModel.primaryLanguage) {
-                        ForEach(viewModel.selectedLanguages.sorted { $0.rawValue < $1.rawValue }) { lang in
+                Section(header: Text("Speech Recognition Language")) {
+                    Picker("Active Language", selection: $viewModel.primaryLanguage) {
+                        ForEach(SpeechLanguage.allCases) { lang in
                             Text("\(lang.flag) \(lang.displayName)").tag(lang)
                         }
                     }
-                    Text("Aura listens using the Primary language. You can pre-enable others to switch quickly.")
+                    Text("Aura will listen using this language. Switching updates recognition immediately.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
                 Section(header: Text("Auto Detection")) {
-                    Toggle(isOn: $viewModel.autoDetectEnabled) {
-                        Text("Auto-detect & switch primary")
+                    HStack {
+                        Text("Auto-detect & switch language")
+                        Spacer()
+                        Text("Coming Soon")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
-                    Text("Monitors recent utterances (≥25 chars aggregated). Switches when confidence ≥65% and at least 90s since last switch.")
+                    Text("Automatic language detection will arrive in a future version. It will listen for language shifts and switch recognition seamlessly.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
+                        .italic()
                 }
                 Section(header: Text("About")) {
                     Text("Aura AI Companion")
@@ -47,6 +38,7 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .onAppear { viewModel.autoDetectEnabled = false }
         }
     }
 }
