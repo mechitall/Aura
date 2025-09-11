@@ -58,6 +58,7 @@ struct CleanAuraView: View {
     @ObservedObject var viewModel: ChatViewModel
     @State private var pulseScale: CGFloat = 1.0
     @State private var breathingScale: CGFloat = 1.0
+    @State private var showingTutorial: Bool = false
     
     private var auraColor: Color { Color(red: 0.4, green: 0.2, blue: 0.8) }
     
@@ -170,7 +171,28 @@ struct CleanAuraView: View {
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // Help button overlay
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button {
+                            showingTutorial = true
+                        } label: {
+                            Image(systemName: "questionmark.circle")
+                                .font(.title2)
+                                .foregroundStyle(.primary)
+                                .padding(10)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .shadow(radius: 2, y: 1)
+                        }
+                        .accessibilityLabel("Open Aura tutorial")
+                        .padding([.top, .trailing], 18)
+                    }
+                    Spacer()
+                }
             }
+            .sheet(isPresented: $showingTutorial) { TutorialCarouselView(isPresented: $showingTutorial) }
         }
     }
     
@@ -1278,5 +1300,86 @@ struct DailyAnalysisView: View {
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 14).fill(.ultraThinMaterial))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.primary.opacity(0.08), lineWidth: 1))
+    }
+}
+
+// MARK: - Tutorial Carousel View
+struct TutorialCarouselView: View {
+    @Binding var isPresented: Bool
+    @State private var selection: Int = 0
+
+    private struct Slide: Identifiable { let id = UUID(); let title: String; let subtitle: String; let image: String; let detail: String }
+    private let slides: [Slide] = [
+        .init(title: "Welcome to Aura", subtitle: "AI Life Coach", image: "waveform.circle", detail: "Aura listens (with permission) and periodically summarizes or responds. Just speak—no need to tap each time."),
+        .init(title: "Listening", subtitle: "1‑minute windows", image: "ear.and.waveform", detail: "Speech is batched roughly every minute or after longer pauses and sent for contextual insight."),
+        .init(title: "Emotions", subtitle: "30s snapshots", image: "brain.head.profile", detail: "Aura takes lightweight emotional readings to chart your mood over time."),
+        .init(title: "Patterns", subtitle: "Daily insights", image: "chart.bar.doc.horizontal", detail: "Run a pattern analysis to surface triggers, loops, coping strategies, and growth signals."),
+        .init(title: "Therapy Chat", subtitle: "Context aware", image: "text.bubble", detail: "Use the Chat tab to reflect—Aura has access to your recent transcript, emotions & patterns."),
+        .init(title: "Privacy", subtitle: "Control & clear", image: "shield.lefthalf.filled", detail: "You can clear conversation & context anytime. Only processed text is sent to the model."),
+        .init(title: "Get Started", subtitle: "You're ready", image: "hand.thumbsup", detail: "Close this guide and tap the center button if not already listening.")
+    ]
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                TabView(selection: $selection) {
+                    ForEach(Array(slides.enumerated()), id: \.0) { idx, slide in
+                        VStack(spacing: 18) {
+                            Image(systemName: slide.image)
+                                .symbolRenderingMode(.hierarchical)
+                                .font(.system(size: 70))
+                                .foregroundStyle(LinearGradient(colors: [.purple, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .padding(.bottom, 4)
+                            Text(slide.title)
+                                .font(.title2.bold())
+                                .multilineTextAlignment(.center)
+                            Text(slide.subtitle)
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                            Text(slide.detail)
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.top, 2)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 28)
+                        .tag(idx)
+                    }
+                }
+                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
+                .animation(.easeInOut, value: selection)
+
+                HStack(spacing: 16) {
+                    Button("Close") { isPresented = false }
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 10)
+                        .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                    if selection < slides.count - 1 {
+                        Button(action: { withAnimation { selection += 1 } }) {
+                            HStack { Text("Next"); Image(systemName: "chevron.right") }
+                                .fontWeight(.semibold)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                                .background(Capsule().fill(LinearGradient(colors: [.purple, .blue], startPoint: .leading, endPoint: .trailing)))
+                                .foregroundColor(.white)
+                        }
+                    } else {
+                        Button(action: { isPresented = false }) {
+                            HStack { Image(systemName: "play.circle.fill"); Text("Start Using Aura") }
+                                .fontWeight(.semibold)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                                .background(Capsule().fill(LinearGradient(colors: [.purple, .blue], startPoint: .leading, endPoint: .trailing)))
+                                .foregroundColor(.white)
+                        }
+                    }
+                }
+                .padding(.bottom, 12)
+            }
+            .padding(.top, 24)
+            .navigationTitle("Guide")
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { isPresented = false } } }
+        }
     }
 }
