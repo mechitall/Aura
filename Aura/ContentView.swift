@@ -1034,32 +1034,49 @@ struct EmotionalTrendGraph: View {
     private func path(for size: CGSize) -> Path {
         var path = Path()
         guard !points.isEmpty else { return path }
-        let midY = size.height / 2
-        let amplitude = midY - topMargin
-        let stepX = (size.width - 2 * horizontalInset) / CGFloat(max(points.count - 1, 1))
-        path.move(to: CGPoint(x: horizontalInset, y: midY))
-        for (idx, p) in points.enumerated() {
-            let x = horizontalInset + CGFloat(idx) * stepX
-            let y = midY - CGFloat(p.score) * amplitude
-            path.addLine(to: CGPoint(x: x, y: y))
+        // Dynamic scaling: derive min & max; ensure non-zero range
+        let scores = points.map { $0.score }
+        let minScore = scores.min() ?? -1
+        let maxScore = scores.max() ?? 1
+        let range = max(0.05, maxScore - minScore) // avoid collapse
+        // Map score to y: higher (positive) should appear higher visually
+        func yPosition(for score: Double) -> CGFloat {
+            let normalized = (score - minScore) / range // 0...1
+            let inverted = 1 - normalized // so higher score -> smaller y
+            let usableHeight = size.height - topMargin * 2
+            return topMargin + inverted * usableHeight
         }
-        path.addLine(to: CGPoint(x: horizontalInset + CGFloat(max(points.count - 1, 0)) * stepX, y: midY))
+        let stepX = (size.width - 2 * horizontalInset) / CGFloat(max(points.count - 1, 1))
+        if let first = points.first { path.move(to: CGPoint(x: horizontalInset, y: yPosition(for: first.score))) }
+        for (idx, p) in points.enumerated().dropFirst() {
+            let x = horizontalInset + CGFloat(idx) * stepX
+            path.addLine(to: CGPoint(x: x, y: yPosition(for: p.score)))
+        }
         return path
     }
     
     private func fillPath(for size: CGSize) -> Path {
         var path = Path()
         guard !points.isEmpty else { return path }
-        let midY = size.height / 2
-        let amplitude = midY - topMargin
+        let scores = points.map { $0.score }
+        let minScore = scores.min() ?? -1
+        let maxScore = scores.max() ?? 1
+        let range = max(0.05, maxScore - minScore)
+        func yPosition(for score: Double) -> CGFloat {
+            let normalized = (score - minScore) / range
+            let inverted = 1 - normalized
+            let usableHeight = size.height - topMargin * 2
+            return topMargin + inverted * usableHeight
+        }
         let stepX = (size.width - 2 * horizontalInset) / CGFloat(max(points.count - 1, 1))
-        path.move(to: CGPoint(x: horizontalInset, y: midY))
+        if let first = points.first { path.move(to: CGPoint(x: horizontalInset, y: yPosition(for: first.score))) }
         for (idx, p) in points.enumerated() {
             let x = horizontalInset + CGFloat(idx) * stepX
-            let y = midY - CGFloat(p.score) * amplitude
-            path.addLine(to: CGPoint(x: x, y: y))
+            path.addLine(to: CGPoint(x: x, y: yPosition(for: p.score)))
         }
-        path.addLine(to: CGPoint(x: horizontalInset + CGFloat(max(points.count - 1, 0)) * stepX, y: midY))
+        // Close to bottom to fill under curve gracefully
+        path.addLine(to: CGPoint(x: horizontalInset + CGFloat(max(points.count - 1, 0)) * stepX, y: size.height - topMargin))
+        path.addLine(to: CGPoint(x: horizontalInset, y: size.height - topMargin))
         path.closeSubpath()
         return path
     }
