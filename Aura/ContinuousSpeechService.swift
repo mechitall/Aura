@@ -43,9 +43,20 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
     @Published var currentSessionText = ""
     @Published var recordingLevel: Float = 0.0
     @Published var timeUntilNextSend: TimeInterval = 0
+    // Language management
+    @Published var activeLanguage: SpeechLanguage = .english {
+        didSet {
+            if oldValue != self.activeLanguage {
+                self.logger.info("🌐 Switching speech recognition language to \(self.activeLanguage.rawValue)")
+                self.rebuildRecognizerForActiveLanguage()
+            }
+        }
+    }
     
     // MARK: - Callbacks
     var onTextAccumulated: ((String) -> Void)?
+    // Raw final utterance callback (for language detection heuristics)
+    var onFinalUserUtterance: ((String) -> Void)?
     
     // MARK: - Private Properties
     private var speechSegments: [String] = []
@@ -93,9 +104,32 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
     
     // MARK: - Setup
     private func setupSpeechRecognizer() {
-        speechRecognizer = SFSpeechRecognizer(locale: Locale.current) ?? SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+        // Prefer the explicitly selected activeLanguage over system locale for determinism.
+    let locale = self.activeLanguage.locale
+        speechRecognizer = SFSpeechRecognizer(locale: locale) ?? SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
         speechRecognizer?.delegate = self
         logger.info("✅ Continuous speech recognizer initialized for locale: \(self.speechRecognizer?.locale.identifier ?? "unknown")")
+    }
+
+    private func rebuildRecognizerForActiveLanguage() {
+        // Stop any current recognition session first
+        let wasListening = isListening
+        if wasListening { stopContinuousListening() }
+        stopCurrentSession()
+        speechRecognizer = nil
+        setupSpeechRecognizer()
+        if wasListening {
+            // Resume after small delay to avoid race with AVAudioSession teardown
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.startContinuousListening()
+            }
+        }
+    }
+
+    /// Public setter to change language externally.
+    func setLanguage(_ language: SpeechLanguage) {
+        guard activeLanguage != language else { return }
+        activeLanguage = language
     }
     
     private func setupAudioSession() {
@@ -471,6 +505,8 @@ class ContinuousSpeechService: NSObject, ObservableObject, SFSpeechRecognizerDel
                 speechSegments.append(cleanedText)
                 lastMeaningfulSpeechTime = Date()
                 consecutiveSilenceCount = 0
+                // Fire per-utterance callback for auto-language detection
+                onFinalUserUtterance?(cleanedText)
                 
                 logger.info("📝 Added to accumulation: \(cleanedText) (Total: \(self.accumulatedText.count) chars)")
             }

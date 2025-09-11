@@ -33,6 +33,11 @@ struct ContentView: View {
                 .tabItem {
                     Label("Daily", systemImage: "chart.bar.doc.horizontal")
                 }
+            SettingsView(viewModel: viewModel)
+                .tag(4)
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape")
+                }
         }
         .onAppear {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {

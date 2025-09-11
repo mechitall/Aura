@@ -10,6 +10,7 @@ import Combine
 import SwiftUI
 import AVFoundation
 import os.log
+import NaturalLanguage
 
 @MainActor
 class ChatViewModel: ObservableObject {
@@ -37,6 +38,34 @@ class ChatViewModel: ObservableObject {
     @Published var patternAnalysisError: String? = nil
     @Published var lastPatternAnalysisAt: Date? = nil
     private var lastPatternTranscriptHash: Int? = nil
+    // Language selection (multi-select). Maintain a primary used for active recognition.
+    @Published var selectedLanguages: Set<SpeechLanguage> = [.english] {
+        didSet {
+            if self.selectedLanguages.isEmpty { // safety: always keep at least one
+                self.selectedLanguages = [.english]
+            }
+            if !self.selectedLanguages.contains(self.primaryLanguage) {
+                // Auto-adjust primary to a stable deterministic choice (alphabetical)
+                self.primaryLanguage = self.selectedLanguages.sorted { $0.rawValue < $1.rawValue }.first ?? .english
+            }
+            self.persistLanguageSelection()
+        }
+    }
+    @Published var primaryLanguage: SpeechLanguage = .english {
+        didSet {
+            if oldValue != self.primaryLanguage {
+                if !self.selectedLanguages.contains(self.primaryLanguage) {
+                    self.selectedLanguages.insert(self.primaryLanguage)
+                }
+                self.logger.info("🌐 Primary language changed → \(self.primaryLanguage.rawValue)")
+                self.continuousSpeechService.setLanguage(self.primaryLanguage)
+                self.persistLanguageSelection()
+            }
+        }
+    }
+    @Published var autoDetectEnabled: Bool = false {
+        didSet { persistLanguageSelection() }
+    }
 
     struct DailyPattern: Identifiable, Hashable {
         let id = UUID()
@@ -59,6 +88,12 @@ class ChatViewModel: ObservableObject {
     @Published var lastEmotionalAnalysisAt: Date? = nil
     @Published var timeUntilNextEmotionalAnalysis: TimeInterval = 0
     private var emotionalCountdownTimer: Timer?
+    // Auto language detection state
+    private var lastAutoDetectAt: Date? = nil
+    private var recentUtteranceBuffer: [String] = [] // maintain last few utterances for aggregated detection
+    private let autoDetectMinChars: Int = 25
+    private let autoDetectCooldown: TimeInterval = 90 // seconds between automatic switches
+    private let autoDetectConfidenceThreshold: Double = 0.5 // lowered to make detection more responsive
     
     struct EmotionalPoint: Identifiable, Hashable {
         let id = UUID()
@@ -93,6 +128,8 @@ class ChatViewModel: ObservableObject {
     init() {
     // Default emotional state so UI always shows something
     self.lastAnalysis = EmotionalAnalysis(emotion: "Neutral", emoji: "😐")
+    // Load persisted multi-language selection if present
+    migrateAndLoadLanguages()
         setupBindings()
         setupWelcomeMessage()
     // Start emotional analysis loop immediately so it runs every 30s without user interaction
@@ -241,6 +278,16 @@ Do not include any prose outside of the JSON object.
     }
     
     private func setupBindings() {
+        // Bind active language from service (in case changed elsewhere)
+        continuousSpeechService.$activeLanguage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] lang in
+                guard let self = self else { return }
+                if self.primaryLanguage != lang {
+                    self.primaryLanguage = lang
+                }
+            }
+            .store(in: &cancellables)
         // Bind continuous speech service properties to view model
         continuousSpeechService.$recordingLevel
             .receive(on: DispatchQueue.main)
@@ -319,6 +366,132 @@ Do not include any prose outside of the JSON object.
                 await self?.processAccumulatedText(accumulatedText)
             }
         }
+        // Per-utterance callback for language detection
+        continuousSpeechService.onFinalUserUtterance = { [weak self] utterance in
+            Task { @MainActor in
+                self?.handleFinalUtterance(utterance)
+            }
+        }
+    }
+
+    // MARK: - Auto Language Detection
+    private func handleFinalUtterance(_ text: String) {
+        guard autoDetectEnabled else { return }
+        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return }
+        recentUtteranceBuffer.append(cleaned)
+        if recentUtteranceBuffer.count > 6 { recentUtteranceBuffer.removeFirst() }
+        let aggregate = recentUtteranceBuffer.joined(separator: " ")
+        maybeAutoDetectLanguage(on: aggregate)
+    }
+
+    private func maybeAutoDetectLanguage(on aggregate: String) {
+        // Size gate
+        guard aggregate.count >= autoDetectMinChars else {
+            logger.debug("🌐 AutoDetect skip: not enough chars (\(aggregate.count)/\(autoDetectMinChars))")
+            return
+        }
+        // Cooldown gate
+        if let last = lastAutoDetectAt {
+            let since = Date().timeIntervalSince(last)
+            if since < autoDetectCooldown {
+                logger.debug("🌐 AutoDetect skip: cooldown (\(Int(since))s < \(Int(autoDetectCooldown))s)")
+                return
+            }
+        }
+
+        // Heuristic script / token checks first (fast path)
+        if let (heuristicLang, hConf) = heuristicLanguage(for: aggregate) {
+            if heuristicLang != self.primaryLanguage {
+                self.selectedLanguages.insert(heuristicLang)
+                self.logger.info("🌐 Heuristic switch → \(heuristicLang.rawValue) (confidence=\(hConf))")
+                self.primaryLanguage = heuristicLang
+                self.lastAutoDetectAt = Date()
+                return
+            } else {
+                logger.debug("🌐 Heuristic detected current primary (\(heuristicLang.rawValue)); no switch")
+            }
+        }
+
+        // Use built-in language recognizer (slower path)
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(aggregate)
+        guard let hypothesis = recognizer.dominantLanguage else {
+            logger.debug("🌐 AutoDetect skip: no dominantLanguage")
+            return
+        }
+        let confidences = recognizer.languageHypotheses(withMaximum: 3)
+        let confidence = confidences[hypothesis] ?? 0
+        logger.debug("🌐 AutoDetect hypotheses: \(confidences) chosen=\(hypothesis.rawValue) conf=\(confidence)")
+        // Map to supported SpeechLanguage
+        let mapped: SpeechLanguage? = {
+            switch hypothesis {
+            case .english: return .english
+            case .german: return .german
+            case .russian: return .russian
+            default: return nil
+            }
+        }()
+        guard let candidate = mapped else { return }
+        guard candidate != self.primaryLanguage else {
+            logger.debug("🌐 AutoDetect skip: candidate == current (\(candidate.rawValue))")
+            return
+        }
+        guard confidence >= autoDetectConfidenceThreshold else {
+            logger.debug("🌐 AutoDetect skip: confidence \(confidence) < threshold \(autoDetectConfidenceThreshold)")
+            return
+        }
+        self.selectedLanguages.insert(candidate)
+        self.logger.info("🌐 Auto-detected language switch to \(candidate.rawValue) (confidence=\(confidence))")
+        self.primaryLanguage = candidate
+        self.lastAutoDetectAt = Date()
+    }
+
+    private func heuristicLanguage(for text: String) -> (SpeechLanguage, Double)? {
+        // Detect Cyrillic quickly
+        if text.range(of: "[\u0400-\u04FF]", options: .regularExpression) != nil {
+            return (.russian, 0.9)
+        }
+        // German diacritics or common short words pattern; keep false positives low
+        let hasDiacritic = text.range(of: "[äöüÄÖÜß]", options: .regularExpression) != nil
+        let lower = text.lowercased()
+        let germanTokens = [" und ", " ich ", " nicht ", " der ", " die ", " das "]
+        let germanHits = germanTokens.filter { lower.contains($0) }.count
+        if hasDiacritic || germanHits >= 2 {
+            return (.german, hasDiacritic ? 0.85 : 0.7)
+        }
+        return nil
+    }
+
+    // MARK: - Language Persistence
+    private let languageDefaultsKey = "Aura.SelectedLanguages" // stored as array of raw values
+    private let primaryLanguageDefaultsKey = "Aura.PrimaryLanguage"
+    private let legacySingleLanguageKey = "Aura.SelectedLanguage"
+    private let autoDetectDefaultsKey = "Aura.AutoDetectLanguages"
+    private func persistLanguageSelection() {
+        let raws = selectedLanguages.map { $0.rawValue }
+        UserDefaults.standard.set(raws, forKey: languageDefaultsKey)
+        UserDefaults.standard.set(primaryLanguage.rawValue, forKey: primaryLanguageDefaultsKey)
+    UserDefaults.standard.set(autoDetectEnabled, forKey: autoDetectDefaultsKey)
+    }
+    private func migrateAndLoadLanguages() {
+        let defaults = UserDefaults.standard
+        var loadedSet: Set<SpeechLanguage> = []
+        if let array = defaults.array(forKey: languageDefaultsKey) as? [String] {
+            for raw in array { if let lang = SpeechLanguage(rawValue: raw) { loadedSet.insert(lang) } }
+        } else if let legacy = defaults.string(forKey: legacySingleLanguageKey), let lang = SpeechLanguage(rawValue: legacy) {
+            // migrate legacy single value
+            loadedSet.insert(lang)
+        }
+        if loadedSet.isEmpty { loadedSet = [.english] }
+        selectedLanguages = loadedSet
+        if let primaryRaw = defaults.string(forKey: primaryLanguageDefaultsKey), let primary = SpeechLanguage(rawValue: primaryRaw) {
+            primaryLanguage = primary
+        } else {
+            primaryLanguage = loadedSet.sorted { $0.rawValue < $1.rawValue }.first ?? .english
+        }
+    autoDetectEnabled = defaults.bool(forKey: autoDetectDefaultsKey)
+        continuousSpeechService.setLanguage(primaryLanguage)
     }
     
     private func setupWelcomeMessage() {

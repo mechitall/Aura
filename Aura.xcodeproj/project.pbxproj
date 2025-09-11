@@ -20,6 +20,8 @@
 		F0017C234567890123456234 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0018D345678901234567345 /* Preview Assets.xcassets */; };
 		F1208D34567890123456CDEF /* ContinuousSpeechService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01319E45678901234567DEFA /* ContinuousSpeechService.swift */; };
 		G2319F56789012345678EFAB /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = H3420G67890123456789FABC /* Config.swift */; };
+		SL001234567890ABCDEF0001 /* SpeechLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = SLREF1234567890ABCDEF0001 /* SpeechLanguage.swift */; };
+		SETT1234567890ABCDEF0001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SETTREF1234567890ABCDEF01 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +40,8 @@
 		C0DEF490123456789012F012 /* ThetaAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThetaAPIService.swift; sourceTree = "<group>"; };
 		C1DEF490123456789012F013 /* ThetaEdgeAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThetaEdgeAnalysisService.swift; sourceTree = "<group>"; };
 		E0F06B123456789012345123 /* AudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioService.swift; sourceTree = "<group>"; };
+		SLREF1234567890ABCDEF0001 /* SpeechLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechLanguage.swift; sourceTree = "<group>"; };
+		SETTREF1234567890ABCDEF01 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,6 +77,8 @@
 				J2K3L4M5N6O7P8Q9R0S1T2U3 /* EmotionalAnalysisService.swift */,
 				E0F06B123456789012345123 /* AudioService.swift */,
 				01319E45678901234567DEFA /* ContinuousSpeechService.swift */,
+				SLREF1234567890ABCDEF0001 /* SpeechLanguage.swift */,
+				SETTREF1234567890ABCDEF01 /* SettingsView.swift */,
 				23AF9B567890123456789567 /* Info.plist */,
 				CD205091234567890123450C /* Preview Content */,
 				H3420G67890123456789FABC /* Config.swift */,
@@ -177,6 +183,8 @@
 				D0EF5A012345678901234012 /* AudioService.swift in Sources */,
 				F1208D34567890123456CDEF /* ContinuousSpeechService.swift in Sources */,
 				1A2B3C4D5E6F7890ABCD1234 /* AuraApp.swift in Sources */,
+				SL001234567890ABCDEF0001 /* SpeechLanguage.swift in Sources */,
+				SETT1234567890ABCDEF0001 /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
