@@ -22,6 +22,7 @@
 		G2319F56789012345678EFAB /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = H3420G67890123456789FABC /* Config.swift */; };
 		SL001234567890ABCDEF0001 /* SpeechLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = SLREF1234567890ABCDEF0001 /* SpeechLanguage.swift */; };
 		SETT1234567890ABCDEF0001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SETTREF1234567890ABCDEF01 /* SettingsView.swift */; };
+		DSBLD1234567890ABCDEF0001 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = DSREF1234567890ABCDEF0001 /* DesignSystem.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 		E0F06B123456789012345123 /* AudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioService.swift; sourceTree = "<group>"; };
 		SLREF1234567890ABCDEF0001 /* SpeechLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechLanguage.swift; sourceTree = "<group>"; };
 		SETTREF1234567890ABCDEF01 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		DSREF1234567890ABCDEF0001 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -79,6 +81,7 @@
 				01319E45678901234567DEFA /* ContinuousSpeechService.swift */,
 				SLREF1234567890ABCDEF0001 /* SpeechLanguage.swift */,
 				SETTREF1234567890ABCDEF01 /* SettingsView.swift */,
+				DSREF1234567890ABCDEF0001 /* DesignSystem.swift */,
 				23AF9B567890123456789567 /* Info.plist */,
 				CD205091234567890123450C /* Preview Content */,
 				H3420G67890123456789FABC /* Config.swift */,
@@ -185,6 +188,7 @@
 				1A2B3C4D5E6F7890ABCD1234 /* AuraApp.swift in Sources */,
 				SL001234567890ABCDEF0001 /* SpeechLanguage.swift in Sources */,
 				SETT1234567890ABCDEF0001 /* SettingsView.swift in Sources */,
+				DSBLD1234567890ABCDEF0001 /* DesignSystem.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

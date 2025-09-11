@@ -85,7 +85,7 @@ ChatViewModel (@MainActor)
 - **Graph Rendering:** Custom path + gradient + emoji row outside clipped chart.
 - **Parsing Strategies:** Colon split, emoji scan, whitelist keywords for emotions; JSON substring or bullet heuristic for patterns.
 - **Prompts:** Persona system prompt for coaching; dedicated minimal JSON extraction prompt for pattern analysis.
- - **Auto Language Detection:** Aggregates recent final utterances (≤6, ≥25 chars total) → `NLLanguageRecognizer`; switches primary language if mapped locale in enabled set (or auto-add), confidence ≥0.65, and ≥90s since prior switch.
+- **Auto Language Detection:** Aggregates recent final utterances (≤6, ≥25 chars total) → `NLLanguageRecognizer`; switches primary language if mapped locale in enabled set (or auto-add), confidence ≥0.65, and ≥90s since prior switch.
 
 ## � Key Source Files
 
