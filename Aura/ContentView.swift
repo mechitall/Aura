@@ -1221,6 +1221,11 @@ struct DailyAnalysisView: View {
                 .foregroundColor(.white)
             }
             .disabled(viewModel.isPatternAnalyzing || (viewModel.accumulatedText.isEmpty && viewModel.livePartial.isEmpty))
+            if let lastAt = viewModel.lastPatternAnalysisAt {
+                Text("Last run: \(lastAt, style: .time)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
             if viewModel.patternAnalysisError != nil {
                 Text(viewModel.patternAnalysisError ?? "")
                     .font(.footnote)

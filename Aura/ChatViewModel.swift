@@ -35,6 +35,8 @@ class ChatViewModel: ObservableObject {
     @Published var dailyPatterns: [DailyPattern] = []
     @Published var isPatternAnalyzing: Bool = false
     @Published var patternAnalysisError: String? = nil
+    @Published var lastPatternAnalysisAt: Date? = nil
+    private var lastPatternTranscriptHash: Int? = nil
 
     struct DailyPattern: Identifiable, Hashable {
         let id = UUID()
@@ -130,10 +132,16 @@ class ChatViewModel: ObservableObject {
     func analyzeDailyPatterns() {
         let transcript = fullTranscript()
         guard !transcript.isEmpty else {
-            self.patternAnalysisError = "No transcript available yet"
+            patternAnalysisError = "No transcript available yet"
             return
         }
         guard !isPatternAnalyzing else { return }
+        // Prevent immediate redundant re-run on identical transcript (within 30s window)
+        let currentHash = transcript.hashValue
+        if let lastHash = lastPatternTranscriptHash, lastHash == currentHash, let lastTime = lastPatternAnalysisAt, Date().timeIntervalSince(lastTime) < 30 {
+            patternAnalysisError = "Already analyzed (no new speech yet). Speak more before re-running."
+            return
+        }
         isPatternAnalyzing = true
         patternAnalysisError = nil
         logger.info("🧩 Starting daily pattern analysis (len=\(transcript.count) chars)")
@@ -142,6 +150,8 @@ class ChatViewModel: ObservableObject {
                 let patterns = try await self.generatePatternAnalysis(transcript: transcript)
                 self.dailyPatterns = patterns
                 logger.info("✅ Daily pattern analysis complete: found \(patterns.count) patterns")
+                self.lastPatternAnalysisAt = Date()
+                self.lastPatternTranscriptHash = currentHash
             } catch {
                 self.patternAnalysisError = error.localizedDescription
                 logger.error("❌ Daily pattern analysis failed: \(error.localizedDescription)")
@@ -712,6 +722,33 @@ Do not include any prose outside of the JSON object.
         return dailyPatterns.map { p in "- \(p.title): \(p.summary)" }.joined(separator: "\n")
     }
     
+    // MARK: - Transcript Context for Therapy Chat
+    /// Returns a trimmed transcript (most recent N characters) for therapy chat context.
+    func therapyTranscriptContext(maxChars: Int = 6000) -> String {
+        let full = [accumulatedText, livePartial]
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard full.count > maxChars else { return full }
+        return String(full.suffix(maxChars))
+    }
+    
+    /// Returns patterns as a compact JSON-like string for injection.
+    func therapyPatternsContext() -> String {
+        guard !dailyPatterns.isEmpty else { return "[]" }
+        let dicts: [[String: String]] = dailyPatterns.map { p in
+            [
+                "title": p.title,
+                "summary": p.summary,
+                "emoji": p.emoji,
+                "evidence": p.evidenceSnippet
+            ]
+        }
+        if let data = try? JSONSerialization.data(withJSONObject: dicts, options: []) {
+            return String(data: data, encoding: .utf8) ?? "[]"
+        }
+        return "[]"
+    }
+    
     func sendTherapyMessage(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -723,11 +760,15 @@ Do not include any prose outside of the JSON object.
             guard let self = self else { return }
             let emotionalSummary = self.buildEmotionalTrendSummary()
             let patternSummary = self.buildPatternSummaries()
+            let transcriptCtx = self.therapyTranscriptContext()
+            let patternsJSON = self.therapyPatternsContext()
             do {
                 let reply = try await self.apiService.generateTherapyResponse(
                     userMessage: trimmed,
                     emotionalTrendSummary: emotionalSummary,
                     patternSummaries: patternSummary,
+                    transcriptContext: transcriptCtx,
+                    patternsJSON: patternsJSON,
                     priorTherapyTurns: self.therapyMessages
                 )
                 await MainActor.run {

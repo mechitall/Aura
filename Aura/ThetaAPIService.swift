@@ -411,8 +411,13 @@ class ThetaAPIService {
     
     // New therapy (exploratory coaching) response generator.
     // Provides reflective, question-oriented responses integrating emotional timeline & discovered patterns.
-    func generateTherapyResponse(userMessage: String, emotionalTrendSummary: String, patternSummaries: String, priorTherapyTurns: [ChatMessage]) async throws -> String {
-        let systemPrompt = """
+    func generateTherapyResponse(userMessage: String,
+                                 emotionalTrendSummary: String,
+                                 patternSummaries: String,
+                                 transcriptContext: String,
+                                 patternsJSON: String,
+                                 priorTherapyTurns: [ChatMessage]) async throws -> String {
+    let systemPrompt = """
 You are Aura, an advanced therapeutic conversational AI focused on guided self-exploration.
 Style & Principles:
 - Use SHORT responses (2–4 sentences) ending with a gentle, specific question.
@@ -423,12 +428,16 @@ Style & Principles:
 - Avoid numbered lists & monotonous question stems (vary: "What feels…", "In what ways…", "When did you first notice…", "How does that connect to…").
 - If the user seems stuck, help them zoom in (specific triggers) or zoom out (broader themes) with one reframing prompt.
 
-Context (optional to reference):
-Emotional Trend (recent):
-\(emotionalTrendSummary)
-
-Identified Patterns:
+Context Provided (reference selectively – do not dump verbatim each turn):
+- Emotional Trend (recent chronological snapshots): \(emotionalTrendSummary)
+- Transcript Recent Window (may be partial, last ~6k chars) between <TRANSCRIPT> markers:
+<TRANSCRIPT>
+\(transcriptContext)
+</TRANSCRIPT>
+- Patterns (human-readable summaries):
 \(patternSummaries)
+- Patterns (raw JSON array):
+\(patternsJSON)
 
 Output Requirements:
 - No markdown, lists, or bullets.
@@ -445,13 +454,7 @@ Output Requirements:
         }.joined(separator: "\n")
         
     let userPrompt = """
-Prior reflective turns (most recent last):
-\(convoContext)
-
-Current user input:
-\(userMessage)
-
-Craft your response now following the style rules. Provide exactly one response.
+Prior reflective turns (most recent last):\n\(convoContext)\n\nUser input: \(userMessage)\n\nTASK: Respond concisely (2–4 sentences) weaving in only the MOST RELEVANT portions of the provided context (emotions, transcript fragments, patterns) IF and ONLY IF they deepen reflection. End with one guiding question.
 """
         
         // Use one-off so we don't pollute main continuous chat context.
